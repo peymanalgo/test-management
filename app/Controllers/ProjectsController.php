@@ -18,4 +18,11 @@ class ProjectsController extends BaseController
         }
         return view('projects/index', ['projects'=>$model->orderBy('id','DESC')->findAll()]);
     }
+
+    public function tree(int $id)
+    {
+        if (!session('user_id')) return redirect()->to('/login'); $db=db_connect(); $project=$db->table('projects')->where('id',$id)->get()->getFirstRow('array'); if(!$project) throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
+        if(strtolower($this->request->getMethod())==='post'){ $name=trim((string)$this->request->getPost('name')); if(!$name)return redirect()->back()->with('error','نام ماژول الزامی است.'); $db->table('project_nodes')->insert(['project_id'=>$id,'parent_id'=>$this->request->getPost('parent_id')?:null,'name'=>$name,'sort_order'=>0,'is_active'=>1,'created_at'=>gmdate('Y-m-d H:i:s'),'updated_at'=>gmdate('Y-m-d H:i:s')]); return redirect()->back()->with('message','ماژول ثبت شد.'); }
+        return view('projects/tree',['project'=>$project,'nodes'=>$db->table('project_nodes')->where('project_id',$id)->orderBy('parent_id')->orderBy('sort_order')->get()->getResultArray()]);
+    }
 }
