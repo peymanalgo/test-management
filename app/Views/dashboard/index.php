@@ -1,0 +1,1 @@
+<!doctype html><html lang="fa" dir="rtl"><meta charset="utf-8"><title>داشبورد</title><body><h1>سلام <?= esc(session('display_name')) ?></h1><p>سامانه مدیریت تست آماده است.</p><form method="post" action="/logout"><?= csrf_field() ?><button>خروج</button></form></body></html>
