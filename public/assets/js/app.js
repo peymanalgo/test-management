@@ -1,0 +1,1 @@
+document.addEventListener('input',(event)=>{const input=event.target.closest('[data-grid-search]');if(!input)return;const table=document.querySelector(input.dataset.gridSearch);if(!table)return;const q=input.value.trim().toLocaleLowerCase('fa');table.querySelectorAll('tbody tr').forEach(row=>row.hidden=!row.innerText.toLocaleLowerCase('fa').includes(q));});

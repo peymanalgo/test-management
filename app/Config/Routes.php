@@ -10,6 +10,7 @@ $routes->get('dashboard', 'DashboardController::index');
 $routes->match(['get', 'post'], 'projects', 'ProjectsController::index');
 $routes->match(['get', 'post'], 'projects/(:num)/tree', 'ProjectsController::tree/$1');
 $routes->match(['get', 'post'], 'test-cases', 'TestCasesController::index');
+$routes->match(['get', 'post'], 'test-cases/(:num)', 'TestCasesController::edit/$1');
 $routes->match(['get', 'post'], 'test-runs', 'TestRunsController::index');
 $routes->get('my-tasks', 'WorkbenchController::index');
 $routes->get('defects', 'DefectsController::index');

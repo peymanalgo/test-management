@@ -19,4 +19,10 @@ class TestCasesController extends BaseController
         }
         return view('modules/test_cases',['cases'=>$db->query('SELECT t.*,p.name project_name FROM test_cases t JOIN projects p ON p.id=t.project_id ORDER BY t.id DESC')->getResultArray(),'projects'=>$db->table('projects')->where('status','ACTIVE')->get()->getResultArray()]);
     }
+
+    public function edit(int $id)
+    {
+        if(!session('user_id'))return redirect()->to('/login');$db=db_connect();$case=$db->table('test_cases')->where('id',$id)->get()->getFirstRow('array');if(!$case)throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
+        if(strtolower($this->request->getMethod())==='post'){ $db->table('test_cases')->where('id',$id)->update(['title'=>trim((string)$this->request->getPost('title')),'priority'=>(string)$this->request->getPost('priority'),'expected_result'=>(string)$this->request->getPost('expected_result'),'updated_by'=>session('user_id'),'updated_at'=>gmdate('Y-m-d H:i:s')]);return redirect()->to('/test-cases')->with('message','سناریو ویرایش شد.');}return view('modules/test_case_edit',['case'=>$case]);
+    }
 }
