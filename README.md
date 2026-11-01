@@ -1,69 +1,83 @@
-# CodeIgniter 4 Application Starter
+# آزمون‌یار — سامانه مدیریت تست نرم‌افزار
 
-## What is CodeIgniter?
+سامانه تحت وب فارسی و راست‌چین برای مدیریت تست دستی نرم‌افزارها (PHP 8.2+ / CodeIgniter 4 / MySQL-MariaDB) — مطابق سند `AI_Test_Management_System_Specification_FA.md`.
 
-CodeIgniter is a PHP full-stack web framework that is light, fast, flexible and secure.
-More information can be found at the [official site](https://codeigniter.com).
+## اجرای سریع (ویندوز + Wamp64)
 
-This repository holds a composer-installable app starter.
-It has been built from the
-[development repository](https://github.com/codeigniter4/CodeIgniter4).
+ساده‌ترین راه — یکی از این دو:
 
-More information about the plans for version 4 can be found in [CodeIgniter 4](https://forum.codeigniter.com/forumdisplay.php?fid=28) on the forums.
+```bash
+./start.sh          # در Git Bash
+```
 
-You can read the [user guide](https://codeigniter.com/user_guide/)
-corresponding to the latest version of the framework.
+یا دابل‌کلیک روی `start.bat`.
 
-## Installation & updates
+اسکریپت به‌ترتیب: PHP را پیدا می‌کند → سرویس MariaDB را در صورت نیاز بالا می‌آورد → دیتابیس `ai_test_manager` را در صورت نبود می‌سازد → Migration های معلق را اعمال می‌کند → مدیر اولیه را در صورت نبود ایجاد می‌کند → وب‌سرور PHP را روی `0.0.0.0:3838` اجرا می‌کند → مرورگر را باز می‌کند.
 
-`composer create-project codeigniter4/appstarter` then `composer update` whenever
-there is a new release of the framework.
+| دستور | کار |
+|---|---|
+| `./start.sh` | اجرای کامل سرویس‌ها (پورت پیش‌فرض 3838) |
+| `./start.sh run 8090` | اجرا با پورت دلخواه |
+| `./start.sh stop` | توقف وب‌سرور |
+| `./start.sh restart` | ری‌استارت وب‌سرور |
 
-When updating, check the release notes to see if there are any changes you might need to apply
-to your `app` folder. The affected files can be copied or merged from
-`vendor/codeigniter4/framework/app`.
+- ورود: `http://localhost:3838/login` (از شبکه محلی هم با IP نمایش‌داده‌شده در خروجی اسکریپت در دسترس است)
+- نام کاربری: `admin`
+- رمز عبور: مقدار `INITIAL_ADMIN_PASSWORD` در فایل `.env`
+- لاگ وب‌سرور: `writable/logs/server.log`
 
-## Setup
+## اجرای دستی (بدون اسکریپت)
 
-Copy `env` to `.env` and tailor for your app, specifically the baseURL
-and any database settings.
+1. پیش‌نیازها: PHP 8.2+ با افزونه‌های `mysqli`, `mbstring`, `intl` و MySQL/MariaDB در حال اجرا (پورت پیش‌فرض 3307).
+2. فایل `env` را به `.env` کپی و مقادیر دیتابیس و `app.baseURL` و `INITIAL_ADMIN_PASSWORD` را تنظیم کنید.
+3. `php spark migrate` و سپس `php spark db:seed InitialAdminSeeder` (با متغیر محیطی `INITIAL_ADMIN_PASSWORD`).
+4. `php spark serve --host 0.0.0.0 --port 3838`
 
-## Important Change with index.php
+## ساختار کلیدی
 
-`index.php` is no longer in the root of the project! It has been moved inside the *public* folder,
-for better security and separation of components.
+```
+start.sh / start.bat      اجرای کامل سرویس‌ها
+bin/ensure_ready.php      آماده‌سازی دیتابیس و مدیر اولیه
+app/Controllers           کنترلرها (Auth، پروژه، سناریو، دوره، کارتابل، خطا، ادمین)
+app/Database/Migrations   اسکیمای کامل ۲۳ جدولی سند
+app/Views                 ویوهای فارسی RTL
+public/assets             CSS/JS محلی (بدون CDN)
+prototype.html            پروتوتایپ تعاملی UI (مرجع طراحی)
+docs/                     سند مشخصات، طراحی محصول، بررسی و نقشه راه
+```
 
-This means that you should configure your web server to "point" to your project's *public* folder, and
-not to the project root. A better practice would be to configure a virtual host to point there. A poor practice would be to point your web server to the project root and expect to enter *public/...*, as the rest of your logic and the
-framework are exposed.
+## مستندات
 
-**Please** read the user guide for a better explanation of how CI4 works!
+- سند مشخصات کامل: `AI_Test_Management_System_Specification_FA.md`
+- طراحی مرجع محصول: `docs/PRODUCT_DESIGN_FA.md`
+- گزارش بررسی و نقشه راه + پیشنهاد UI: `docs/REVIEW_AND_ROADMAP_FA.md`
+- تصمیم‌های معماری: `docs/DECISIONS.md`
 
-## Repository Management
+## وضعیت پیاده‌سازی
 
-We use GitHub issues, in our main repository, to track **BUGS** and to track approved **DEVELOPMENT** work packages.
-We use our [forum](http://forum.codeigniter.com) to provide SUPPORT and to discuss
-FEATURE REQUESTS.
+فازهای ۰ و ۱ سند (زیرساخت و شروع پروژه‌ها) به‌صورت اولیه انجام شده؛ فهرست کامل شکاف‌ها و فازبندی پیشنهادی ادامه کار در `docs/REVIEW_AND_ROADMAP_FA.md` آمده است.
 
-This repository is a "distribution" one, built by our release preparation script.
-Problems with it can be raised on our forum, or as issues in the main repository.
+> ⚠️ `.env` شامل اطلاعات اتصال و رمز اولیه است و هرگز commit نمی‌شود (در `.gitignore` است).
 
-## Server Requirements
+## حساب‌های کاربری نمونه (دادهٔ نمایشی)
 
-PHP version 8.2 or higher is required, with the following extensions installed:
+| نقش | نام کاربری | رمز عبور | چه می‌بیند؟ |
+|---|---|---|---|
+| مدیر سیستم | `admin` | مقدار `INITIAL_ADMIN_PASSWORD` در `.env` | داشبورد، پروژه‌ها، سناریوها، کاربران — **بدون کارتابل** |
+| آزمونگر | `tester` | `Pe123Ym321An` | فقط کارتابل (تست سناریوهای بخش‌هایش، ثبت PASS/FAIL/BLOCKED و خطا) |
+| برنامه‌نویس | `developer` | `Pe123Ym321An` | فقط کارتابل (اصلاح خطاهای ارجاعی + اعلام رفع) |
+| مدیر پروژه | `manager` | `Pe123Ym321An` | فقط کارتابل (دیدن همهٔ سناریوهای بخش‌هایش + تأیید/رد/بازگشایی/لغو) |
 
-- [intl](http://php.net/manual/en/intl.requirements.php)
-- [mbstring](http://php.net/manual/en/mbstring.installation.php)
+پروژهٔ نمایشی «فروشگاه اینترنتی آریا» (کد SHOP) با درخت ماژول، مسئولان و ۵+ سناریو از قبل ساخته شده است.
 
-> [!WARNING]
-> - The end of life date for PHP 7.4 was November 28, 2022.
-> - The end of life date for PHP 8.0 was November 26, 2023.
-> - The end of life date for PHP 8.1 was December 31, 2025.
-> - If you are still using below PHP 8.2, you should upgrade immediately.
-> - The end of life date for PHP 8.2 will be December 31, 2026.
+## گردش کار پیاده‌سازی‌شده
 
-Additionally, make sure that the following extensions are enabled in your PHP:
-
-- json (enabled by default - don't turn it off)
-- [mysqlnd](http://php.net/manual/en/mysqlnd.install.php) if you plan to use MySQL
-- [libcurl](http://php.net/manual/en/curl.requirements.php) if you plan to use the HTTP\CURLRequest library
+```
+سناریو در بخش تعریف می‌شود → بلافاصله با وضعیت «در صف تست» به کارتابل آزمونگر می‌رود
+  → شروع تست (در حال تست) → ثبت نتیجه:
+     PASS   → در انتظار تأیید مدیر → تأیید شده / رد شده
+     FAIL   → ثبت خطا → کارتابل برنامه‌نویس (در انتظار اصلاح) → اعلام رفع → کارتابل آزمونگر (آمادهٔ تست مجدد) → ...
+     BLOCKED→ مسدود → رفع مانع → آمادهٔ تست مجدد
+  مدیر می‌تواند: بازگشایی (↺) و لغو (✕) با دلیل الزامی
+```
+هر انتقال: تراکنش اتمیک + ثبت در تاریخچهٔ گردش کار + اعلان به مسئول بعدی.

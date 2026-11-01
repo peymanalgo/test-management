@@ -84,7 +84,8 @@ php_errors.log
 #-------------------------
 # Composer
 #-------------------------
-vendor/
+# vendor/ داخل مخزن می‌ماند تا هاست بدون Composer اجرا شود
+/install/install.lock
 /tools/
 /composer-setup.php
 /_scaffold/
