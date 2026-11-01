@@ -14,3 +14,4 @@ $routes->match(['get', 'post'], 'test-cases/(:num)', 'TestCasesController::edit/
 $routes->match(['get', 'post'], 'test-runs', 'TestRunsController::index');
 $routes->get('my-tasks', 'WorkbenchController::index');
 $routes->get('defects', 'DefectsController::index');
+$routes->match(['get', 'post'], 'admin/users', 'AdminUsersController::index');
