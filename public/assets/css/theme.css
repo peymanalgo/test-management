@@ -634,3 +634,10 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
 [dir="ltr"] .code,[dir="ltr"] .tbl b[style*="direction:ltr"]{direction:ltr}
 [dir="ltr"] .modal-h .x{margin-inline-start:auto}
 [dir="ltr"] .input-ltr{direction:ltr;text-align:left}
+
+/* دکمهٔ خروج در نوار بالا (کنار زنگ) */
+.topbar-exit{margin:0}
+.topbar-exit button{width:40px;height:40px;border-radius:11px;border:1px solid var(--line);background:var(--surface);
+  display:grid;place-items:center;cursor:pointer;color:var(--muted);transition:.15s}
+.topbar-exit button svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.topbar-exit button:hover{border-color:var(--danger);color:var(--danger);background:#fdecec;transform:translateY(-1px)}
