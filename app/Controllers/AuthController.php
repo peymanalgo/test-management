@@ -9,7 +9,7 @@ class AuthController extends BaseController
     public function login()
     {
         if (session('user_id')) return redirect()->to('/dashboard');
-        if ($this->request->getMethod() === 'POST') {
+        if (strtolower($this->request->getMethod()) === 'post') {
             $user = (new UserModel())->findByUsername(trim((string) $this->request->getPost('username')));
             if (!$user || !password_verify((string) $this->request->getPost('password'), $user['password_hash'])) return redirect()->back()->with('error', 'نام کاربری یا رمز عبور نادرست است.');
             session()->regenerate();
