@@ -40,15 +40,20 @@ class UpdateController extends Controller
     public function check()
     {
         if (!session('is_admin')) return $this->response->setStatusCode(403)->setJSON(['ok' => false, 'message' => 'دسترسی مجاز نیست.']);
-        $remote = $this->fetch(self::CDN . self::REPO . '@' . self::BRANCH . '/VERSION');
+        // cache-bust برای دور زدن کَش CDN
+        $remote = $this->fetch(self::CDN . self::REPO . '@' . self::BRANCH . '/VERSION?t=' . time());
+        if ($remote === null) {
+            // بدون cache-bust
+            $remote = $this->fetch(self::CDN . self::REPO . '@' . self::BRANCH . '/VERSION');
+        }
         if ($remote === null) {
             return $this->response->setJSON([
                 'ok' => false,
-                'message' => 'اتصال به سرور آپدیت ممکن نشد. CDN را بعداً امتحان کنید یا فایل‌ها را دستی آپلود کنید.',
+                'message' => 'اتصال به سرور آپدیت ممکن نشد.',
                 'local' => $this->localVersion(),
             ]);
         }
-        $remoteVersion = trim($remote);
+        $remoteVersion = $this->cleanVersion($remote);
         $localVersion = $this->localVersion();
         $hasUpdate = $remoteVersion !== $localVersion;
         return $this->response->setJSON([
@@ -111,12 +116,9 @@ class UpdateController extends Controller
         }
 
         // ۳) به‌روزرسانی VERSION
-        $remoteVersion = $this->fetch(self::CDN . self::REPO . '@' . self::BRANCH . '/VERSION');
-        if ($remoteVersion !== null) {
-            $v = trim($remoteVersion);
-            if (str_starts_with($v, 'VERSION=')) $v = trim(substr($v, 8));
-            @file_put_contents($root . '/VERSION', $v);
-        }
+        $remoteVersion = $this->fetch(self::CDN . self::REPO . '@' . self::BRANCH . '/VERSION?t=' . time());
+        if ($remoteVersion === null) $remoteVersion = $this->fetch(self::CDN . self::REPO . '@' . self::BRANCH . '/VERSION');
+        if ($remoteVersion !== null) @file_put_contents($root . '/VERSION', $this->cleanVersion($remoteVersion));
 
         $msg = "آپدیت کامل شد: $updated فایل به‌روزرسانی، $skipped فایل رد شد.";
         if (!empty($errors)) $msg .= ' خطاها: ' . implode('؛ ', array_slice($errors, 0, 5));
@@ -129,14 +131,17 @@ class UpdateController extends Controller
         ]);
     }
 
+    private function cleanVersion(string $raw): string
+    {
+        $v = trim($raw);
+        if (str_starts_with($v, 'VERSION=')) $v = trim(substr($v, 8));
+        return $v;
+    }
+
     private function localVersion(): string
     {
         $v = @file_get_contents(FCPATH . 'VERSION');
-        if ($v === false) return 'unknown';
-        $v = trim($v);
-        // حذف پیشوند VERSION= اگر وجود دارد
-        if (str_starts_with($v, 'VERSION=')) $v = trim(substr($v, 8));
-        return $v;
+        return $v !== false ? $this->cleanVersion($v) : 'unknown';
     }
 
     private function fetch(string $url): ?string
