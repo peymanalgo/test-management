@@ -45,6 +45,11 @@ $routes->group('', ['filter' => 'auth'], static function (RouteCollection $route
     $routes->post('admin/users/save', 'AdminUsersController::save');
     $routes->post('admin/users/(:num)/toggle', 'AdminUsersController::toggle/$1');
 
+    // ---------------- ادمین: آپدیت ----------------
+    $routes->get('admin/update', 'UpdateController::index');
+    $routes->get('admin/update/check', 'UpdateController::check');
+    $routes->post('admin/update/apply', 'UpdateController::apply');
+
     // ---------------- کارتابل (غیرادمین) ----------------
     $routes->get('workbench', 'WorkbenchController::index');
     $routes->get('workbench/(:num)/detail', 'WorkbenchController::detail/$1');          // جزئیات برای مودال

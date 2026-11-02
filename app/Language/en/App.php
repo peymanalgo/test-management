@@ -474,4 +474,18 @@ return [
     'ntf.approved_msg' => 'Case “{code}” approved by the project manager.',
     'ntf.rejected' => 'Case result rejected',
     'ntf.cancelled' => 'Case cancelled',
+
+    // Update
+    'update.title' => 'System Update',
+    'update.desc' => 'Check and pull the latest code from GitHub — only application files (no database or settings).',
+    'update.checking' => 'Checking for updates…',
+    'update.up_to_date' => 'You are up to date.',
+    'update.new_version' => 'A new version is available!',
+    'update.local_version' => 'Current version',
+    'update.remote_version' => 'Latest version',
+    'update.apply' => 'Download & Apply Update',
+    'update.applying' => 'Downloading and applying…',
+    'update.done' => 'Update applied successfully.',
+    'update.failed' => 'Update failed.',
+    'update.connection_error' => 'Cannot connect to update server.',
 ];
