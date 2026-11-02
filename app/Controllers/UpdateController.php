@@ -6,16 +6,16 @@ use CodeIgniter\Controller;
 
 /**
  * آپدیت خودکار سامانه از گیت‌هاب — فقط ادمین.
- * از CDN jsdelivr (در ایران در دسترس) فایل‌ها را می‌گیرد و اعمال می‌کند.
+ * برای دور زدن کَش CDN (@main تا ۱۲ ساعت کَش می‌شود)،
+ * اول hash آخرین کامیت را از Data API می‌گیرد و با آن دانلود می‌کند.
  */
 class UpdateController extends Controller
 {
     private const REPO = 'peymanalgo/test-management';
-    private const BRANCH = 'main';
     private const CDN = 'https://cdn.jsdelivr.net/gh/';
     private const API = 'https://data.jsdelivr.com/v1/packages/gh/';
+    private const FLAT_API = 'https://data.jsdelivr.com/v1/packages/gh/';
 
-    /** مسیرهایی که آپدیت می‌شوند (فقط کد — نه .env و writable و vendor) */
     private const UPDATE_PATHS = [
         'app/Controllers/',
         'app/Views/',
@@ -32,55 +32,44 @@ class UpdateController extends Controller
     public function index()
     {
         if (!session('is_admin')) return redirect()->to('/workbench');
-        $localVersion = $this->localVersion();
-        return view('admin/update', ['localVersion' => $localVersion]);
+        return view('admin/update', ['localVersion' => $this->localVersion()]);
     }
 
-    /** AJAX: بررسی آخرین نسخه از CDN */
+    /** AJAX: بررسی — همیشه دکمهٔ آپدیت را نشان می‌دهیم */
     public function check()
     {
-        if (!session('is_admin')) return $this->response->setStatusCode(403)->setJSON(['ok' => false, 'message' => 'دسترسی مجاز نیست.']);
-        // cache-bust برای دور زدن کَش CDN
-        $remote = $this->fetch(self::CDN . self::REPO . '@' . self::BRANCH . '/VERSION?t=' . time());
-        if ($remote === null) {
-            // بدون cache-bust
-            $remote = $this->fetch(self::CDN . self::REPO . '@' . self::BRANCH . '/VERSION');
-        }
-        if ($remote === null) {
-            return $this->response->setJSON([
-                'ok' => false,
-                'message' => 'اتصال به سرور آپدیت ممکن نشد.',
-                'local' => $this->localVersion(),
-            ]);
-        }
-        $remoteVersion = $this->cleanVersion($remote);
-        $localVersion = $this->localVersion();
-        $hasUpdate = $remoteVersion !== $localVersion;
+        if (!session('is_admin')) return $this->response->setStatusCode(403)->setJSON(['ok' => false]);
+        $commit = $this->getLatestCommit();
+        $local = $this->localVersion();
         return $this->response->setJSON([
             'ok' => true,
-            'hasUpdate' => $hasUpdate,
-            'local' => $localVersion,
-            'remote' => $remoteVersion,
-            'message' => $hasUpdate ? 'نسخهٔ جدیدی در دسترس است.' : 'شما آخرین نسخه را دارید.',
+            'hasUpdate' => true, // همیشه دکمه را نشان بده — کَش CDN قابل‌اعتماد نیست
+            'local' => $local,
+            'remote' => $commit ?: 'unknown',
+            'commit' => $commit,
+            'message' => $commit ? 'برای دریافت آخرین تغییرات، آپدیت را بزنید.' : 'اتصال به CDN ممکن نیست — بعداً تلاش کنید.',
         ]);
     }
 
     /** AJAX: دریافت و اعمال آپدیت */
     public function apply()
     {
-        if (!session('is_admin')) return $this->response->setStatusCode(403)->setJSON(['ok' => false, 'message' => 'دسترسی مجاز نیست.']);
-        $maxTime = ini_get('max_execution_time');
-        set_time_limit(300); // ۵ دقیقه
-
+        if (!session('is_admin')) return $this->response->setStatusCode(403)->setJSON(['ok' => false]);
+        set_time_limit(300);
         $root = FCPATH;
         $updated = 0;
         $errors = [];
         $skipped = 0;
 
-        // ۱) فهرست فایل‌ها از jsdelivr Data API
-        $fileList = $this->fetch(self::API . self::REPO . '@' . self::BRANCH . '?structure=flat');
+        // ۱) آخرین کامیت — دور زدن کَش @main
+        $commit = $this->getLatestCommit();
+        $ref = $commit ?: 'main'; // fallback
+        $base = self::CDN . self::REPO . '@' . $ref . '/';
+
+        // ۲) فهرست فایل‌ها
+        $fileList = $this->fetch(self::FLAT_API . self::REPO . '@' . $ref . '?structure=flat');
         if ($fileList === null) {
-            return $this->response->setJSON(['ok' => false, 'message' => 'دریافت فهرست فایل‌ها از CDN ممکن نشد.']);
+            return $this->response->setJSON(['ok' => false, 'message' => 'دریافت فهرست فایل‌ها ممکن نشد.']);
         }
         $data = json_decode($fileList, true);
         $files = $data['files'] ?? [];
@@ -88,80 +77,74 @@ class UpdateController extends Controller
             return $this->response->setJSON(['ok' => false, 'message' => 'فهرست فایل‌ها خالی است.']);
         }
 
-        // ۲) فیلتر و دانلود
+        // ۳) دانلود و ذخیره
         foreach ($files as $file) {
             $path = $file['name'] ?? '';
             if ($path === '' || $path === '/') continue;
 
-            // فقط مسیرهای مجاز
             $allowed = false;
             foreach (self::UPDATE_PATHS as $prefix) {
                 if (str_starts_with($path, $prefix)) { $allowed = true; break; }
             }
             if (!$allowed) { $skipped++; continue; }
 
-            // دانلود از CDN
-            $content = $this->fetch(self::CDN . self::REPO . '@' . self::BRANCH . '/' . $path);
-            if ($content === null) { $errors[] = "خطا در دریافت: $path"; continue; }
+            $content = $this->fetch($base . $path);
+            if ($content === null) { $errors[] = "خطا: $path"; continue; }
 
             // ذخیره در مسیر اصلی
             $target = $root . '/' . $path;
             $dir = dirname($target);
             if (!is_dir($dir)) @mkdir($dir, 0755, true);
-            if (@file_put_contents($target, $content) === false) {
-                $errors[] = "خطا در نوشتن: $path";
-            } else {
-                $updated++;
-            }
+            if (@file_put_contents($target, $content) !== false) $updated++;
+            else $errors[] = "نوشتن نشد: $path";
 
-            // اگر فایل از public/assets است، در assets/ هم ذخیره کن (برای هاست‌هایی که public را flat کردند)
+            // برای هاست‌هایی که public را flat کردند (public/assets → assets)
             if (str_starts_with($path, 'public/assets/')) {
-                $altPath = substr($path, 7); // حذف 'public/'
-                $altTarget = $root . '/' . $altPath;
-                $altDir = dirname($altTarget);
-                if (!is_dir($altDir)) @mkdir($altDir, 0755, true);
-                @file_put_contents($altTarget, $content);
+                $alt = $root . '/' . substr($path, 7);
+                @mkdir(dirname($alt), 0755, true);
+                @file_put_contents($alt, $content);
             }
         }
 
-        // ۳) به‌روزرسانی VERSION
-        $remoteVersion = $this->fetch(self::CDN . self::REPO . '@' . self::BRANCH . '/VERSION?t=' . time());
-        if ($remoteVersion === null) $remoteVersion = $this->fetch(self::CDN . self::REPO . '@' . self::BRANCH . '/VERSION');
-        if ($remoteVersion !== null) @file_put_contents($root . '/VERSION', $this->cleanVersion($remoteVersion));
+        // ۴) ذخیرهٔ commit hash به‌عنوان نسخهٔ محلی
+        if ($commit) @file_put_contents($root . '/VERSION', $commit);
 
-        $msg = "آپدیت کامل شد: $updated فایل به‌روزرسانی، $skipped فایل رد شد.";
-        if (!empty($errors)) $msg .= ' خطاها: ' . implode('؛ ', array_slice($errors, 0, 5));
-
+        $msg = "آپدیت کامل شد: $updated فایل به‌روزرسانی.";
+        if (!empty($errors)) $msg .= ' (' . count($errors) . ' خطا)';
         return $this->response->setJSON([
-            'ok' => empty($errors) || $updated > 0,
+            'ok' => $updated > 0,
             'message' => $msg,
             'updated' => $updated,
-            'errors' => $errors,
+            'commit' => $commit,
         ]);
     }
 
-    private function cleanVersion(string $raw): string
+    /** hash آخرین کامیت را از jsdelivr Data API می‌گیرد (کَش نمی‌شود) */
+    private function getLatestCommit(): ?string
     {
-        $v = trim($raw);
-        if (str_starts_with($v, 'VERSION=')) $v = trim(substr($v, 8));
-        return $v;
+        static $commit = null;
+        if ($commit !== null) return $commit;
+        $json = $this->fetch(self::FLAT_API . self::REPO . '/resolved?specifier=main');
+        if ($json) {
+            $data = json_decode($json, true);
+            $commit = $data['version'] ?? null;
+        }
+        return $commit;
     }
 
     private function localVersion(): string
     {
         $v = @file_get_contents(FCPATH . 'VERSION');
-        return $v !== false ? $this->cleanVersion($v) : 'unknown';
+        return $v !== false ? trim($v) : 'unknown';
     }
 
     private function fetch(string $url): ?string
     {
-        // روش ۱: allow_url_fopen
         if (ini_get('allow_url_fopen')) {
             $ctx = stream_context_create(['http' => ['timeout' => 15, 'user_agent' => 'AzmoonYar-Updater/1.0']]);
             $result = @file_get_contents($url, false, $ctx);
             if ($result !== false) return $result;
         }
-        // روش ۲: cURL
         if (function_exists('curl_init')) {
             $ch = curl_init($url);
             curl_setopt_array($ch, [
