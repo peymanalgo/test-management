@@ -12,7 +12,7 @@ robocopy "%CD%" "%STAGE%" /MIR /NFL /NDL /NJH /NJS /NP ^
   /XD "%CD%\.git" "%CD%\tools" "%CD%\_scaffold" "%CD%\writable\cache" "%CD%\writable\logs" "%CD%\writable\session" "%CD%\writable\debugbar" ^
   /XF ".env" "composer-setup.php" "start.sh" "start.bat" "azmoon-yar-release.zip" >nul
 
-powershell -NoProfile -Command "Compress-Archive -Path '%STAGE%\*' -DestinationPath '%OUT%' -Force"
+tar --force-local -a -c -f "%OUT%" -C "%STAGE%" .
 rmdir /s /q "%STAGE%"
 
 if exist "%OUT%" (
