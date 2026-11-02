@@ -11,75 +11,63 @@
 
 <div class="card" style="max-width:640px">
   <div class="card-b">
-    <div style="margin-bottom:20px">
-      <div style="display:flex;align-items:center;gap:12px;padding:16px;background:var(--bg);border-radius:13px">
-        <span style="font-size:32px" id="update-icon">⏳</span>
-        <div style="flex:1">
-          <b id="update-label"><?= t('update.checking') ?></b>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px" id="update-detail">
-            <?= t('update.local_version') ?>: <code style="direction:ltr;display:inline-block;font-size:10px"><?= esc(substr($localVersion, 0, 12)) ?></code>
-          </div>
-        </div>
+    <div style="margin-bottom:20px;padding:16px;background:var(--bg);border-radius:13px;display:flex;gap:12px;align-items:center">
+      <span style="font-size:32px" id="u-ic">⏳</span>
+      <div style="flex:1">
+        <b id="u-lbl">در حال بررسی…</b>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px" id="u-det">—</div>
       </div>
     </div>
-    <div id="update-result" class="hide" style="margin-bottom:20px"></div>
+    <div id="u-res" class="hide" style="margin-bottom:16px"></div>
     <div class="btn-row">
-      <button class="btn" id="btn-apply" onclick="applyUpdate()">
-        ⬇ <?= t('update.apply') ?>
-      </button>
-      <button class="btn alt" onclick="checkUpdate()">
-        🔄 <?= t('update.recheck') ?>
-      </button>
+      <button class="btn" id="u-btn" onclick="applyUpd()" disabled style="opacity:.5">⬇ دریافت و اعمال آپدیت</button>
+      <button class="btn alt" onclick="checkUpd()">🔄 بررسی مجدد</button>
     </div>
   </div>
 </div>
 
 <script>
-window.I18N.update = {
-  checking: <?= json_encode(t('update.checking')) ?>,
-  up_to_date: <?= json_encode(t('update.up_to_date')) ?>,
-  new_version: <?= json_encode(t('update.new_version')) ?>,
-  apply: <?= json_encode(t('update.apply')) ?>,
-  applying: <?= json_encode(t('update.applying')) ?>,
-};
-
-async function checkUpdate() {
-  const el = qs('#update-icon'), lbl = qs('#update-label'), det = qs('#update-detail');
-  el.textContent = '⏳'; lbl.textContent = I18N.update.checking;
+async function checkUpd() {
+  const ic = qs('#u-ic'), lbl = qs('#u-lbl'), det = qs('#u-det'), btn = qs('#u-btn');
+  ic.textContent = '⏳'; lbl.textContent = 'در حال بررسی…'; btn.disabled = true; btn.style.opacity = .5;
+  qs('#u-res').classList.add('hide');
   try {
     const d = await api('/admin/update/check');
-    el.textContent = '📦';
-    lbl.textContent = d.message || 'برای دریافت آخرین تغییرات، آپدیت را بزنید.';
-    if (d.remote && d.remote !== 'در دسترس') {
-      det.innerHTML = `نسخهٔ جدید: <code style="font-size:10px">${esc(String(d.remote).slice(0,30))}</code>`;
+    if (d.hasUpdate) {
+      ic.textContent = '📦'; lbl.textContent = 'نسخهٔ جدیدی در دسترس است.';
+      det.innerHTML = `فعلی: <code style="font-size:10px">${esc(String(d.local).slice(0,20))}</code> → جدید: <code style="font-size:10px">${esc(String(d.remote).slice(0,20))}</code>`;
+      btn.disabled = false; btn.style.opacity = 1;
+    } else {
+      ic.textContent = '✅'; lbl.textContent = 'شما آخرین نسخه را دارید.';
+      det.innerHTML = `نسخه: <code style="font-size:10px">${esc(String(d.local).slice(0,20))}</code>`;
+      btn.disabled = true; btn.style.opacity = .5;
     }
   } catch (e) {
-    el.textContent = '📦';
-    lbl.textContent = 'برای دریافت آخرین تغییرات، دکمهٔ آپدیت را بزنید.';
+    ic.textContent = '📦'; lbl.textContent = 'بررسی ممکن نبود — می‌توانید مستقیم آپدیت کنید.';
+    btn.disabled = false; btn.style.opacity = 1;
   }
 }
 
-async function applyUpdate() {
-  const el = qs('#update-icon'), lbl = qs('#update-label'), btn = qs('#btn-apply'), res = qs('#update-result');
-  el.textContent = '⏬'; lbl.textContent = I18N.update.applying; btn.disabled = true; btn.style.opacity = .5;
-  res.classList.add('hide');
+async function applyUpd() {
+  const ic = qs('#u-ic'), lbl = qs('#u-lbl'), btn = qs('#u-btn'), res = qs('#u-res');
+  ic.textContent = '⏬'; lbl.textContent = 'در حال دریافت… (حدود ۳۰ ثانیه)'; btn.disabled = true; btn.style.opacity = .5;
   try {
     const d = await api('/admin/update/apply', { method: 'POST' });
     res.classList.remove('hide');
     res.innerHTML = d.ok
-      ? `<div class="flash ok">✓ ${esc(d.message)}<br><small>Commit: <code>${esc((d.commit||'').slice(0,8))}</code> — صفحه در حال رفرش…</small></div>`
+      ? `<div class="flash ok">✓ ${esc(d.message)} — صفحه در حال رفرش…</div>`
       : `<div class="flash err">⚠ ${esc(d.message)}</div>`;
-    el.textContent = d.ok ? '✅' : '⚠️';
-    lbl.textContent = d.ok ? '<?= t("update.done") ?>' : '<?= t("update.failed") ?>';
-    if (d.ok) setTimeout(() => location.reload(), 3000);
+    ic.textContent = d.ok ? '✅' : '⚠️';
+    lbl.textContent = d.ok ? 'آپدیت با موفقیت اعمال شد.' : 'آپدیت ناموفق بود.';
+    if (d.ok) setTimeout(() => location.reload(), 2000);
   } catch (e) {
     res.classList.remove('hide');
     res.innerHTML = `<div class="flash err">⚠ ${esc(e.message)}</div>`;
-    el.textContent = '⚠️'; lbl.textContent = '<?= t("update.failed") ?>';
+    ic.textContent = '⚠️'; lbl.textContent = 'آپدیت ناموفق بود.';
   }
   btn.disabled = false; btn.style.opacity = 1;
 }
 
-document.addEventListener('DOMContentLoaded', checkUpdate);
+document.addEventListener('DOMContentLoaded', checkUpd);
 </script>
 <?= $this->endSection() ?>

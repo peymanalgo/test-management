@@ -5,27 +5,67 @@ namespace App\Controllers;
 use CodeIgniter\Controller;
 
 /**
- * آپدیت خودکار سامانه از گیت‌هاب — فقط ادمین.
- * برای دور زدن کَش CDN (@main تا ۱۲ ساعت کَش می‌شود)،
- * اول hash آخرین کامیت را از Data API می‌گیرد و با آن دانلود می‌کند.
+ * آپدیت خودکار — ساده و مطمئن.
+ * بدون هیچ API بیرونی؛ فقط دانلود مستقیم فایل‌ها از Statically CDN.
  */
 class UpdateController extends Controller
 {
     private const REPO = 'peymanalgo/test-management';
-    private const CDN = 'https://cdn.jsdelivr.net/gh/';
-    private const API = 'https://data.jsdelivr.com/v1/packages/gh/';
-    private const FLAT_API = 'https://data.jsdelivr.com/v1/packages/gh/';
+    /** CDN اصلی — Statically (کَش کمتر، در ایران در دسترس) */
+    private const CDN_STAT = 'https://cdn.statically.io/gh/';
+    /** CDN جایگزین — raw.githubusercontent (همیشه تازه، ممکن است بلاک باشد) */
+    private const CDN_RAW = 'https://raw.githubusercontent.com/';
+    /** CDN سوم — jsdelivr (در ایران باز، کَش زیاد) */
+    private const CDN_JSD = 'https://cdn.jsdelivr.net/gh/';
 
-    private const UPDATE_PATHS = [
-        'app/Controllers/',
-        'app/Views/',
-        'app/Config/',
-        'app/Language/',
-        'app/Services/',
-        'app/Models/',
-        'app/Filters/',
+    /** فایل‌هایی که آپدیت می‌شوند — hardcoded، بدون API */
+    private const FILES = [
+        // Controllers
+        'app/Controllers/AuthController.php',
+        'app/Controllers/AssetController.php',
+        'app/Controllers/BaseController.php',
+        'app/Controllers/DashboardController.php',
+        'app/Controllers/DefectsController.php',
+        'app/Controllers/Home.php',
+        'app/Controllers/LangController.php',
+        'app/Controllers/NotificationsController.php',
+        'app/Controllers/ProjectsController.php',
+        'app/Controllers/TestCasesController.php',
+        'app/Controllers/TestRunsController.php',
+        'app/Controllers/UpdateController.php',
+        'app/Controllers/WorkbenchController.php',
+        // Config (فقط مواردی که تغییر می‌کنند)
+        'app/Config/App.php',
+        'app/Config/Filters.php',
+        'app/Config/Routes.php',
+        // Filters
+        'app/Filters/AuthFilter.php',
+        'app/Filters/LocaleFilter.php',
+        // Language
+        'app/Language/fa/App.php',
+        'app/Language/en/App.php',
+        // Models
+        'app/Models/ProjectModel.php',
+        'app/Models/UserModel.php',
+        // Services
+        'app/Services/WorkflowService.php',
+        // Common
         'app/Common.php',
-        'public/assets/',
+        // Views
+        'app/Views/layouts/main.php',
+        'app/Views/auth/login.php',
+        'app/Views/dashboard/index.php',
+        'app/Views/projects/index.php',
+        'app/Views/projects/tree.php',
+        'app/Views/test_cases/index.php',
+        'app/Views/workbench/index.php',
+        'app/Views/admin/users.php',
+        'app/Views/admin/update.php',
+        'app/Views/notifications/index.php',
+        // Assets
+        'public/assets/css/theme.css',
+        'public/assets/js/app.js',
+        // Version
         'VERSION',
     ];
 
@@ -35,74 +75,48 @@ class UpdateController extends Controller
         return view('admin/update', ['localVersion' => $this->localVersion()]);
     }
 
-    /** AJAX: بررسی — ساده و بدون وابستگی به API بیرونی */
+    /** AJAX: بررسی — VERSION محلی را با CDN مقایسه می‌کند */
     public function check()
     {
         if (!session('is_admin')) return $this->response->setStatusCode(403)->setJSON(['ok' => false]);
         $local = $this->localVersion();
-        // تلاش برای دریافت VERSION از CDN — فقط اطلاعاتی، نه شرط
         $remote = $this->fetchFile('VERSION');
         $remoteVersion = $remote !== null ? trim($remote) : null;
+
+        if ($remoteVersion === null) {
+            return $this->response->setJSON([
+                'ok' => true, 'hasUpdate' => true, 'local' => $local,
+                'remote' => 'در دسترس', 'commit' => null,
+                'message' => 'بررسی نسخه ممکن نبود — می‌توانید مستقیم آپدیت کنید.',
+            ]);
+        }
+        $hasUpdate = trim($local) !== $remoteVersion;
         return $this->response->setJSON([
-            'ok' => true,
-            'hasUpdate' => true,
-            'local' => $local,
-            'remote' => $remoteVersion ?: 'در دسترس',
-            'commit' => $remoteVersion,
-            'message' => 'برای دریافت آخرین تغییرات، دکمهٔ آپدیت را بزنید.',
+            'ok' => true, 'hasUpdate' => $hasUpdate, 'local' => $local,
+            'remote' => $remoteVersion, 'commit' => $remoteVersion,
+            'message' => $hasUpdate ? 'نسخهٔ جدیدی در دسترس است.' : 'شما آخرین نسخه را دارید.',
         ]);
     }
 
-    /** AJAX: دریافت و اعمال آپدیت */
+    /** AJAX: دانلود و اعمال */
     public function apply()
     {
         if (!session('is_admin')) return $this->response->setStatusCode(403)->setJSON(['ok' => false]);
-        set_time_limit(300);
+        @set_time_limit(120);
         $root = FCPATH;
         $updated = 0;
-        $errors = [];
-        $skipped = 0;
+        $failed = [];
 
-        // ۱) آخرین کامیت — دور زدن کَش @main
-        $commit = $this->getLatestCommit();
-        $ref = $commit ?: 'main'; // fallback
-        $base = self::CDN . self::REPO . '@' . $ref . '/';
-
-        // ۲) فهرست فایل‌ها
-        $fileList = $this->fetch(self::FLAT_API . self::REPO . '@' . $ref . '?structure=flat');
-        if ($fileList === null) {
-            return $this->response->setJSON(['ok' => false, 'message' => 'دریافت فهرست فایل‌ها ممکن نشد.']);
-        }
-        $data = json_decode($fileList, true);
-        $files = $data['files'] ?? [];
-        if (empty($files)) {
-            return $this->response->setJSON(['ok' => false, 'message' => 'فهرست فایل‌ها خالی است.']);
-        }
-
-        // ۳) دانلود و ذخیره
-        foreach ($files as $file) {
-            $path = $file['name'] ?? '';
-            // حذف / ابتدایی که Data API اضافه می‌کند
-            $path = ltrim($path, '/');
-            if ($path === '' || $path === '/') continue;
-
-            $allowed = false;
-            foreach (self::UPDATE_PATHS as $prefix) {
-                if (str_starts_with($path, $prefix)) { $allowed = true; break; }
-            }
-            if (!$allowed) { $skipped++; continue; }
-
+        foreach (self::FILES as $path) {
             $content = $this->fetchFile($path);
-            if ($content === null) { $errors[] = "خطا: $path"; continue; }
+            if ($content === null) { $failed[] = basename($path); continue; }
 
-            // ذخیره در مسیر اصلی
             $target = $root . '/' . $path;
-            $dir = dirname($target);
-            if (!is_dir($dir)) @mkdir($dir, 0755, true);
+            @mkdir(dirname($target), 0755, true);
             if (@file_put_contents($target, $content) !== false) $updated++;
-            else $errors[] = "نوشتن نشد: $path";
+            else $failed[] = basename($path);
 
-            // برای هاست‌هایی که public را flat کردند (public/assets → assets)
+            // برای هاست‌هایی که public/assets را به assets منتقل کرده‌اند
             if (str_starts_with($path, 'public/assets/')) {
                 $alt = $root . '/' . substr($path, 7);
                 @mkdir(dirname($alt), 0755, true);
@@ -110,44 +124,29 @@ class UpdateController extends Controller
             }
         }
 
-        // ۴) ذخیرهٔ commit hash به‌عنوان نسخهٔ محلی
-        if ($commit) @file_put_contents($root . '/VERSION', $commit);
+        // VERSION را تازه کن
+        $v = $this->fetchFile('VERSION');
+        if ($v !== null) @file_put_contents($root . '/VERSION', trim($v));
 
-        $msg = "آپدیت کامل شد: $updated فایل به‌روزرسانی.";
-        if (!empty($errors)) $msg .= ' (' . count($errors) . ' خطا)';
-        return $this->response->setJSON([
-            'ok' => $updated > 0,
-            'message' => $msg,
-            'updated' => $updated,
-            'commit' => $commit,
-        ]);
+        $msg = $updated > 0
+            ? "آپدیت کامل شد: $updated فایل به‌روزرسانی شد."
+            : 'هیچ فایلی آپدیت نشد — CDN در دسترس نیست.';
+        if (!empty($failed) && count($failed) <= 5) $msg .= ' (ناموفق: ' . implode(', ', $failed) . ')';
+
+        return $this->response->setJSON(['ok' => $updated > 0, 'message' => $msg, 'updated' => $updated]);
     }
 
-    /** hash آخرین کامیت را از Data API می‌گیرد */
-    private function getLatestCommit(): ?string
-    {
-        static $commit = null;
-        if ($commit !== null) return $commit;
-        $json = $this->fetch(self::FLAT_API . self::REPO . '/resolved?specifier=main');
-        if ($json) {
-            $data = json_decode($json, true);
-            $commit = $data['version'] ?? null;
-        }
-        return $commit;
-    }
-
-    /** دانلود از چند منبع — اولین منبع تازه برمی‌گرداند */
+    /** دانلود یک فایل از CDN ها (به ترتیب اولویت) */
     private function fetchFile(string $path): ?string
     {
-        // منبع ۱: Statically CDN (کَش کمتر — تازه‌ترین)
-        $r = $this->fetch('https://cdn.statically.io/gh/' . self::REPO . '/main/' . $path);
+        // ۱: Statically — تازه‌ترین، در ایران در دسترس
+        $r = $this->fetchUrl(self::CDN_STAT . self::REPO . '/main/' . $path);
         if ($r !== null) return $r;
-        // منبع ۲: raw.githubusercontent (همیشه تازه، ممکن است در ایران بلاک باشد)
-        $r = $this->fetch('https://raw.githubusercontent.com/' . self::REPO . '/main/' . $path);
+        // ۲: raw.githubusercontent — همیشه تازه
+        $r = $this->fetchUrl(self::CDN_RAW . self::REPO . '/main/' . $path);
         if ($r !== null) return $r;
-        // منبع ۳: jsdelivr (قطعاً در ایران باز است ولی کَش تا ۱۲ ساعت)
-        $r = $this->fetch(self::CDN . self::REPO . '@main/' . $path);
-        return $r;
+        // ۳: jsdelivr — fallback
+        return $this->fetchUrl(self::CDN_JSD . self::REPO . '@main/' . $path);
     }
 
     private function localVersion(): string
@@ -156,26 +155,27 @@ class UpdateController extends Controller
         return $v !== false ? trim($v) : 'unknown';
     }
 
-    private function fetch(string $url): ?string
+    private function fetchUrl(string $url): ?string
     {
-        if (ini_get('allow_url_fopen')) {
-            $ctx = stream_context_create(['http' => ['timeout' => 15, 'user_agent' => 'AzmoonYar-Updater/1.0']]);
-            $result = @file_get_contents($url, false, $ctx);
-            if ($result !== false) return $result;
-        }
         if (function_exists('curl_init')) {
             $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 20,
+                CURLOPT_TIMEOUT => 10,
                 CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_USERAGENT => 'AzmoonYar-Updater/1.0',
+                CURLOPT_USERAGENT => 'AzmoonYar/1.0',
                 CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_CONNECTTIMEOUT => 5,
             ]);
-            $result = curl_exec($ch);
+            $r = curl_exec($ch);
             $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-            if ($code === 200 && $result !== false) return $result;
+            if ($code === 200 && $r !== false && $r !== '') return $r;
+        }
+        if (ini_get('allow_url_fopen')) {
+            $ctx = stream_context_create(['http' => ['timeout' => 10, 'user_agent' => 'AzmoonYar/1.0']]);
+            $r = @file_get_contents($url, false, $ctx);
+            if ($r !== false && $r !== '') return $r;
         }
         return null;
     }
