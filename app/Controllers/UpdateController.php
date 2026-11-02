@@ -112,7 +112,11 @@ class UpdateController extends Controller
 
         // ۳) به‌روزرسانی VERSION
         $remoteVersion = $this->fetch(self::CDN . self::REPO . '@' . self::BRANCH . '/VERSION');
-        if ($remoteVersion !== null) @file_put_contents($root . '/VERSION', $remoteVersion);
+        if ($remoteVersion !== null) {
+            $v = trim($remoteVersion);
+            if (str_starts_with($v, 'VERSION=')) $v = trim(substr($v, 8));
+            @file_put_contents($root . '/VERSION', $v);
+        }
 
         $msg = "آپدیت کامل شد: $updated فایل به‌روزرسانی، $skipped فایل رد شد.";
         if (!empty($errors)) $msg .= ' خطاها: ' . implode('؛ ', array_slice($errors, 0, 5));
@@ -128,7 +132,11 @@ class UpdateController extends Controller
     private function localVersion(): string
     {
         $v = @file_get_contents(FCPATH . 'VERSION');
-        return $v !== false ? trim($v) : 'unknown';
+        if ($v === false) return 'unknown';
+        $v = trim($v);
+        // حذف پیشوند VERSION= اگر وجود دارد
+        if (str_starts_with($v, 'VERSION=')) $v = trim(substr($v, 8));
+        return $v;
     }
 
     private function fetch(string $url): ?string

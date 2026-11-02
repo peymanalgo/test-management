@@ -71,7 +71,7 @@ async function applyUpdate() {
   const el = qs('#update-icon'), lbl = qs('#update-label'), btn = qs('#btn-apply'), res = qs('#update-result');
   el.textContent = '⏬'; lbl.textContent = I18N.update.applying; btn.disabled = true; btn.style.opacity = .5;
   try {
-    const d = await api('/admin/update/apply');
+    const d = await api('/admin/update/apply', { method: 'POST' });
     res.classList.remove('hide');
     res.innerHTML = d.ok
       ? `<div class="flash ok">✓ ${esc(d.message)}</div>`

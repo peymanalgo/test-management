@@ -48,7 +48,7 @@ $routes->group('', ['filter' => 'auth'], static function (RouteCollection $route
     // ---------------- ادمین: آپدیت ----------------
     $routes->get('admin/update', 'UpdateController::index');
     $routes->get('admin/update/check', 'UpdateController::check');
-    $routes->post('admin/update/apply', 'UpdateController::apply');
+    $routes->match(['GET', 'POST'], 'admin/update/apply', 'UpdateController::apply');
 
     // ---------------- کارتابل (غیرادمین) ----------------
     $routes->get('workbench', 'WorkbenchController::index');
