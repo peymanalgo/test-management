@@ -88,7 +88,7 @@ class UpdateController extends Controller
             }
             if (!$allowed) { $skipped++; continue; }
 
-            $content = $this->fetch($base . $path);
+            $content = $this->fetchFile($path);
             if ($content === null) { $errors[] = "خطا: $path"; continue; }
 
             // ذخیره در مسیر اصلی
@@ -119,7 +119,7 @@ class UpdateController extends Controller
         ]);
     }
 
-    /** hash آخرین کامیت را از jsdelivr Data API می‌گیرد (کَش نمی‌شود) */
+    /** hash آخرین کامیت را از Data API می‌گیرد */
     private function getLatestCommit(): ?string
     {
         static $commit = null;
@@ -130,6 +130,20 @@ class UpdateController extends Controller
             $commit = $data['version'] ?? null;
         }
         return $commit;
+    }
+
+    /** دانلود از چند منبع — اولین منبع تازه برمی‌گرداند */
+    private function fetchFile(string $path): ?string
+    {
+        // منبع ۱: jsdelivr با @main (کَش ممکن است)
+        $r = $this->fetch(self::CDN . self::REPO . '@main/' . $path);
+        if ($r !== null) return $r;
+        // منبع ۲: Statically CDN (کَش کمتر)
+        $r = $this->fetch('https://cdn.statically.io/gh/' . self::REPO . '/main/' . $path);
+        if ($r !== null) return $r;
+        // منبع ۳: raw.githubusercontent.com (ممکن است بلاک باشد)
+        $r = $this->fetch('https://raw.githubusercontent.com/' . self::REPO . '/main/' . $path);
+        return $r;
     }
 
     private function localVersion(): string
