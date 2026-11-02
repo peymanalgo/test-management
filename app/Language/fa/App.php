@@ -488,4 +488,6 @@ return [
     'update.done' => 'آپدیت با موفقیت اعمال شد.',
     'update.failed' => 'آپدیت ناموفق بود.',
     'update.connection_error' => 'خطا در اتصال به سرور آپدیت.',
+
+    "notif.view_all" => "مشاهدهٔ همهٔ اعلان‌ها",
 ];

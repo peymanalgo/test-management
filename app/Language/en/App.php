@@ -488,4 +488,6 @@ return [
     'update.done' => 'Update applied successfully.',
     'update.failed' => 'Update failed.',
     'update.connection_error' => 'Cannot connect to update server.',
+
+    "notif.view_all" => "View all notifications",
 ];

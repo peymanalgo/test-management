@@ -239,30 +239,114 @@ function wireTabs(scope = document) {
   }));
 }
 
-/* ---------- اعلان‌ها (زنگ) ---------- */
-async function pollBell() {
+/* ---------- اعلان‌ها (زنگ) — کامل و دقیق ---------- */
+let bellOpen = false;
+
+const NOTIF_ICONS = {
+  APPROVAL: { icon: '⏳', bg: 'linear-gradient(135deg,#0891b2,#0e7490)' },
+  DEFECT: { icon: '🐛', bg: 'linear-gradient(135deg,#dc2626,#991b1b)' },
+  RETEST: { icon: '🔄', bg: 'linear-gradient(135deg,#7c3aed,#6d28d9)' },
+  APPROVED: { icon: '✅', bg: 'linear-gradient(135deg,#16a34a,#15803d)' },
+  REJECTED: { icon: '❌', bg: 'linear-gradient(135deg,#dc2626,#b91c1c)' },
+  BLOCKED: { icon: '⛔', bg: 'linear-gradient(135deg,#64748b,#475569)' },
+  CANCELLED: { icon: '🚫', bg: 'linear-gradient(135deg,#94a3b8,#64748b)' },
+};
+
+function timeAgo(isoStr) {
+  const d = new Date(String(isoStr).replace(' ', 'T') + 'Z');
+  const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (diff < 10) return 'الان';
+  if (diff < 60) return `${diff} ثانیه پیش`;
+  if (diff < 3600) return `${Math.floor(diff / 60)} دقیقه پیش`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} ساعت پیش`;
+  return faDate(isoStr);
+}
+
+function renderBellDropdown(d) {
   const host = qs('[data-bell]');
   if (!host) return;
+  const wrap = host.parentElement;
+  const pop = qs('.bell-pop', wrap);
+
+  // badge
+  const dot = qs('.dot', host);
+  if (d.unread > 0) {
+    if (!dot) { const s = document.createElement('span'); s.className = 'dot'; host.appendChild(s); }
+    qs('.dot', host).textContent = d.unread > 99 ? '99+' : d.unread;
+  } else qs('.dot', host)?.remove();
+
+  // dropdown content
+  const items = d.rows.length ? d.rows.map((n) => {
+    const meta = NOTIF_ICONS[n.type] || { icon: '🔔', bg: 'linear-gradient(135deg,#6957e8,#5a49d5)' };
+    return `
+      <div class="notif-item ${n.read_at ? '' : 'unread'}" data-id="${n.id}">
+        <span class="notif-ic" style="background:${meta.bg}">${meta.icon}</span>
+        <div class="notif-body">
+          <b>${esc(n.title)}</b>
+          <p>${esc(n.message)}</p>
+          <time>${timeAgo(n.created_at)}</time>
+        </div>
+        ${n.read_at ? '' : '<span class="notif-dot"></span>'}
+      </div>`;
+  }).join('') : `<div class="notif-empty"><span style="font-size:36px;opacity:.4">🔕</span><p>${L('common.no_notifications')}</p></div>`;
+
+  pop.innerHTML = `
+    <div class="notif-head">
+      <b>${L('common.notifications')}</b>
+      ${d.unread > 0 ? `<span class="notif-badge">${d.unread}</span>` : ''}
+      <button data-readall title="${L('common.read_all')}">${L('common.read_all')}</button>
+    </div>
+    <div class="notif-list">${items}</div>
+    <a class="notif-foot" href="/notifications">${L('notif.view_all')} →</a>`;
+
+  // رویدادها
+  qs('[data-readall]', pop)?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    await api('/notifications/read-all', { method: 'POST' });
+    pollBell();
+  });
+  qsa('.notif-item', pop).forEach((el) => el.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    await api(`/notifications/read/${el.dataset.id}`, { method: 'POST' });
+    pop.classList.remove('open'); bellOpen = false;
+    location.href = '/workbench';
+  }));
+}
+
+async function pollBell() {
   try {
     const d = await api('/notifications/latest');
-    const unread = qs('.dot', host);
-    if (d.unread > 0) {
-      if (!unread) { const s = document.createElement('span'); s.className = 'dot'; host.appendChild(s); }
-      qs('.dot', host).textContent = d.unread > 99 ? '99+' : d.unread;
-    } else qs('.dot', host)?.remove();
-    const pop = qs('.bell-pop', host.parentElement);
-    pop.innerHTML = `
-      <header><b>${L('common.notifications')}</b><button data-readall>${L('common.read_all')}</button></header>
-      ${d.rows.length ? d.rows.map((n) => `
-        <div class="notif-item ${n.read_at ? '' : 'unread'}" data-id="${n.id}">
-          <b>${esc(n.title)}</b><p>${esc(n.message)}</p><time>${faDateTime(n.created_at)}</time>
-        </div>`).join('') : `<div class="center text-muted" style="padding:22px">${L('common.no_notifications')}</div>`}`;
-    qs('[data-readall]', pop)?.addEventListener('click', async () => { await api('/notifications/read-all', { method: 'POST' }); pollBell(); });
-    qsa('.notif-item', pop).forEach((el) => el.addEventListener('click', async () => {
-      await api(`/notifications/read/${el.dataset.id}`, { method: 'POST' });
-      location.href = '/workbench';
-    }));
+    renderBellDropdown(d);
   } catch { /* بی‌صدا */ }
+}
+
+function initBell() {
+  const host = qs('[data-bell]');
+  if (!host) return;
+  const wrap = host.parentElement;
+  const pop = qs('.bell-pop', wrap);
+
+  // toggle
+  host.addEventListener('click', (e) => {
+    e.stopPropagation();
+    bellOpen = !bellOpen;
+    pop.classList.toggle('open', bellOpen);
+    if (bellOpen) pollBell();
+  });
+
+  // بستن با کلیک بیرون
+  document.addEventListener('click', (e) => {
+    if (bellOpen && !wrap.contains(e.target)) {
+      pop.classList.remove('open'); bellOpen = false;
+    }
+  });
+
+  // بستن با Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && bellOpen) {
+      pop.classList.remove('open'); bellOpen = false;
+    }
+  });
 }
 
 /* ---------- سایدبار موبایل ---------- */
@@ -274,6 +358,7 @@ document.addEventListener('click', (e) => {
 /* ---------- بوت ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   wireTabs();
+  initBell();
   pollBell();
-  setInterval(pollBell, 60000);
+  setInterval(pollBell, 30000);
 });
