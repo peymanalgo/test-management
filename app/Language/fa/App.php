@@ -490,4 +490,5 @@ return [
     'update.connection_error' => 'خطا در اتصال به سرور آپدیت.',
 
     "notif.view_all" => "مشاهدهٔ همهٔ اعلان‌ها",
+    "update.recheck" => "بررسی مجدد",
 ];
