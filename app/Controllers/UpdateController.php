@@ -90,7 +90,9 @@ class UpdateController extends Controller
                 'message' => 'بررسی نسخه ممکن نبود — می‌توانید مستقیم آپدیت کنید.',
             ]);
         }
-        $hasUpdate = trim($local) !== $remoteVersion;
+        // اگر نسخهٔ محلی جدیدتر یا برابر CDN باشد → آخرین نسخه
+        // (کد لوکال همیشه جدیدتر از CDN است چون منبع push است)
+        $hasUpdate = $remoteVersion > $local; // مقایسهٔ رشته‌ای ISO timestamp
         return $this->response->setJSON([
             'ok' => true, 'hasUpdate' => $hasUpdate, 'local' => $local,
             'remote' => $remoteVersion, 'commit' => $remoteVersion,
