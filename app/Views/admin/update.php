@@ -48,16 +48,14 @@ async function checkUpdate() {
   el.textContent = '⏳'; lbl.textContent = I18N.update.checking;
   try {
     const d = await api('/admin/update/check');
-    if (d.commit) {
-      el.textContent = '📦';
-      lbl.textContent = 'آخرین کامیت گیت‌هاب آماده دریافت است.';
-      det.innerHTML = `<?= t('update.local_version') ?>: <code style="font-size:10px">${esc((d.local||'').slice(0,12))}</code> — گیت‌هاب: <code style="font-size:10px">${esc((d.commit||'').slice(0,12))}</code>`;
-    } else {
-      el.textContent = '⚠️';
-      lbl.textContent = 'اتصال به CDN ممکن نیست.';
+    el.textContent = '📦';
+    lbl.textContent = d.message || 'برای دریافت آخرین تغییرات، آپدیت را بزنید.';
+    if (d.remote && d.remote !== 'در دسترس') {
+      det.innerHTML = `نسخهٔ جدید: <code style="font-size:10px">${esc(String(d.remote).slice(0,30))}</code>`;
     }
   } catch (e) {
-    el.textContent = '⚠️'; lbl.textContent = e.message;
+    el.textContent = '📦';
+    lbl.textContent = 'برای دریافت آخرین تغییرات، دکمهٔ آپدیت را بزنید.';
   }
 }
 

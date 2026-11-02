@@ -35,19 +35,21 @@ class UpdateController extends Controller
         return view('admin/update', ['localVersion' => $this->localVersion()]);
     }
 
-    /** AJAX: بررسی — همیشه دکمهٔ آپدیت را نشان می‌دهیم */
+    /** AJAX: بررسی — ساده و بدون وابستگی به API بیرونی */
     public function check()
     {
         if (!session('is_admin')) return $this->response->setStatusCode(403)->setJSON(['ok' => false]);
-        $commit = $this->getLatestCommit();
         $local = $this->localVersion();
+        // تلاش برای دریافت VERSION از CDN — فقط اطلاعاتی، نه شرط
+        $remote = $this->fetchFile('VERSION');
+        $remoteVersion = $remote !== null ? trim($remote) : null;
         return $this->response->setJSON([
             'ok' => true,
-            'hasUpdate' => true, // همیشه دکمه را نشان بده — کَش CDN قابل‌اعتماد نیست
+            'hasUpdate' => true,
             'local' => $local,
-            'remote' => $commit ?: 'unknown',
-            'commit' => $commit,
-            'message' => $commit ? 'برای دریافت آخرین تغییرات، آپدیت را بزنید.' : 'اتصال به CDN ممکن نیست — بعداً تلاش کنید.',
+            'remote' => $remoteVersion ?: 'در دسترس',
+            'commit' => $remoteVersion,
+            'message' => 'برای دریافت آخرین تغییرات، دکمهٔ آپدیت را بزنید.',
         ]);
     }
 
