@@ -641,3 +641,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
   display:grid;place-items:center;cursor:pointer;color:var(--muted);transition:.15s}
 .topbar-exit button svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .topbar-exit button:hover{border-color:var(--danger);color:var(--danger);background:#fdecec;transform:translateY(-1px)}
+
+/* آیکن خروج در RTL باید به بیرون اشاره کند */
+[dir="rtl"] .topbar-exit button svg{transform:scaleX(-1)}
+[dir="rtl"] .topbar-exit button:hover svg{transform:scaleX(-1) scale(1.05)}

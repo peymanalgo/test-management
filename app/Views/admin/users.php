@@ -63,7 +63,7 @@ const grid = createGrid({
     { key: 'last_login_at', label: <?= json_encode(t('users.col.last_login')) ?>, render: (r) => `<span class="num">${r.last_login_at ? faDateTime(r.last_login_at) : U.never}</span>` },
     { key: 'is_active', label: L('common.status'), render: (r) => r.is_active == 1 ? `<span class="pill st-approved">${U.active}</span>` : `<span class="pill st-cancelled">${U.inactive}</span>` },
     { label: L('common.actions'), render: (r) => `<span style="white-space:nowrap">
-      <button class="btn xs alt" data-edit='${esc(json_encode(r, JSON_UNESCAPED_UNICODE))}'>${L('common.edit')}</button>
+      <button class="btn xs alt" data-edit='${esc(JSON.stringify(r))}'>${L('common.edit')}</button>
       <button class="btn xs ${r.is_active == 1 ? 'warn' : 'success'}" data-toggle="${r.id}">${r.is_active == 1 ? U.deactivate : U.activate}</button>
     </span>` },
   ],
