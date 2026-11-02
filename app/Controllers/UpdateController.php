@@ -112,6 +112,10 @@ class UpdateController extends Controller
             if ($content === null) { $failed[] = basename($path); continue; }
 
             $target = $root . '/' . $path;
+            // برای فایل‌های app/ در لوکال باید یک سطح بالا برویم (FCPATH = public/)
+            if (!str_starts_with($path, 'public/') && !is_dir(dirname($target))) {
+                $target = dirname($root) . '/' . $path;
+            }
             @mkdir(dirname($target), 0755, true);
             if (@file_put_contents($target, $content) !== false) $updated++;
             else $failed[] = basename($path);
@@ -151,8 +155,13 @@ class UpdateController extends Controller
 
     private function localVersion(): string
     {
-        $v = @file_get_contents(FCPATH . 'VERSION');
-        return $v !== false ? trim($v) : 'unknown';
+        // FCPATH در لوکال = public/ ، در هاست = public_html/
+        // VERSION ممکن است در هر دو باشد
+        foreach ([FCPATH . 'VERSION', dirname(FCPATH) . '/VERSION'] as $p) {
+            $v = @file_get_contents($p);
+            if ($v !== false) return trim($v);
+        }
+        return 'unknown';
     }
 
     private function fetchUrl(string $url): ?string
