@@ -2,43 +2,72 @@
 /**
  * نصب‌کنندهٔ یک‌بارمصرف آزمون‌یار برای هاست cPanel — بدون SSH و بدون Composer.
  *
- * استفاده: پس از بالا بردن فایل‌های پروژه روی هاست، این فایل را از مرورگر باز کنید:
- *   https://your-domain/install.php
- * مراحل: بررسی پیش‌نیازها ← اطلاعات دیتابیس ← ساخت جدول‌ها ← ایجاد مدیر ← تولید .env ← قفل خودکار.
- * پس از نصب موفق، این فایل را حذف کنید (خودش هم قفل می‌شود).
+ * محل فایل مهم نیست؛ هر دو حالت پشتیبانی می‌شود:
+ *   public_html/install.php + public_html/install/schema.sql   (چیدمان استاندارد)
+ *   public_html/install/install.php + schema.sql کنارش          (کل پوشهٔ install کپی شده)
+ *
+ * .env در «ریشهٔ واقعی پروژه» نوشته می‌شود (از روی مسیر app در index.php کشف می‌شود).
+ * پس از نصب موفق، کل پوشهٔ install و install.php را حذف کنید.
  */
 declare(strict_types=1);
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 mb_internal_encoding('UTF-8');
 
-$ROOT = dirname(__FILE__);
-$LOCK = $ROOT . '/install.lock';
-$SELF_LOCKED = false;
-if (is_file($LOCK)) $SELF_LOCKED = true;
+$LOCK = __FILE__ . '.lock';
 
 step_router();
 
 function h(?string $s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
+
+/** یافتن schema.sql در چیدمان‌های مختلف */
+function schema_path(): ?string
+{
+    foreach ([__DIR__ . '/install/schema.sql', __DIR__ . '/schema.sql', dirname(__DIR__) . '/install/schema.sql'] as $p) {
+        if (is_file($p) && is_readable($p)) return $p;
+    }
+    return null;
+}
+
+/** کشف ریشهٔ واقعی پروژه (پوشه‌ای که app/ و writable/ دارد) */
+function project_root(): string
+{
+    // ۱) از مسیر Paths.php که index.php عمومی require می‌کند
+    $idx = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/index.php';
+    if (is_file($idx) && preg_match("#require FCPATH \.\s*'([^']*app/Config/Paths\.php)'#", (string) @file_get_contents($idx), $m)) {
+        $p = $m[1];
+        if (str_starts_with($p, '../')) $p = dirname($idx) . '/' . $p;
+        elseif (!str_starts_with($p, '/')) $p = dirname($idx) . '/' . $p;
+        $root = dirname(dirname(dirname($p))); // .../app/Config/Paths.php → ریشه
+        if (is_dir($root . '/app')) return $root;
+    }
+    // ۲) نامزدهای رایج
+    $cands = [__DIR__, dirname(__DIR__), dirname(__DIR__) . '/azmoon-yar', __DIR__ . '/azmoon-yar', dirname(dirname(__DIR__)) . '/azmoon-yar', $_SERVER['HOME'] ?? '' . '/azmoon-yar'];
+    foreach ($cands as $c) if ($c && is_dir(rtrim($c, '/') . '/app')) return rtrim($c, '/');
+    // ۳) پیش‌فرض: کنار install.php
+    return __DIR__;
+}
+
 function step_router(): void
 {
-    global $SELF_LOCKED;
-    $step = $_POST['step'] ?? '1';
-    if ($SELF_LOCKED) { render_page('نصب قفل شده است', locked_body()); return; }
-    if ($step === '2' && $_SERVER['REQUEST_METHOD'] === 'POST') do_install();
+    global $LOCK;
+    if (is_file($LOCK)) { render_page('نصب قفل شده است', '<div class="ok">نصب‌کننده قبلاً اجرا و قفل شده است. برای نصب مجدد فایل <code>install.php.lock</code> را حذف کنید.</div>'); return; }
+    if (($_POST['step'] ?? '1') === '2' && $_SERVER['REQUEST_METHOD'] === 'POST') do_install();
     render_page('نصب آزمون‌یار', step1_body());
 }
 
 function checks(): array
 {
     $ext = fn(string $e) => ['ok' => extension_loaded($e), 'label' => "افزونهٔ $e"];
-    $writable = static function (string $p) { return ['ok' => is_dir($p) ? is_writable($p) : is_writable(dirname($p)), 'label' => "قابل نوشتن: $p"]; };
-    return array_merge([
+    $root = project_root();
+    $sp = schema_path();
+    return [
         ['ok' => version_compare(PHP_VERSION, '8.2.0', '>='), 'label' => 'PHP ≥ 8.2 (فعلی: ' . PHP_VERSION . ')'],
         $ext('mysqli'), $ext('mbstring'), $ext('intl'), $ext('json'), $ext('fileinfo'), $ext('gd'), $ext('zip'), $ext('dom'), $ext('xml'),
-        $writable(__DIR__), $writable(__DIR__ . '/writable'),
-        ['ok' => is_file(__DIR__ . '/install/schema.sql') && is_readable(__DIR__ . '/install/schema.sql'), 'label' => 'install/schema.sql موجود و قابل خواندن'],
-    ]);
+        ['ok' => is_writable(__DIR__), 'label' => 'قابل نوشتن: ' . __DIR__],
+        ['ok' => is_writable($root) || is_writable(dirname($root)), 'label' => 'قابل نوشتن ریشهٔ پروژه: ' . $root],
+        ['ok' => $sp !== null, 'label' => $sp !== null ? 'schema.sql پیدا شد: ' . basename(dirname($sp)) . '/' . basename($sp) : 'schema.sql پیدا نشد — کنار install.php یا در install/ کنارش'],
+    ];
 }
 
 function step1_body(): string
@@ -68,7 +97,7 @@ HTML;
 
 function do_install(): void
 {
-    global $ROOT;
+    global $LOCK;
     $dbHost = trim($_POST['db_host'] ?? 'localhost');
     $dbName = trim($_POST['db_name'] ?? '');
     $dbUser = trim($_POST['db_user'] ?? '');
@@ -77,19 +106,22 @@ function do_install(): void
     $baseUrl = rtrim(trim($_POST['base_url'] ?? ''), '/') . '/';
     try {
         if ($dbName === '' || $dbUser === '' || strlen($adminPass) < 12) throw new RuntimeException('همهٔ فیلدها الزامی است و رمز مدیر حداقل ۱۲ نویسه باشد.');
+        $schemaFile = schema_path();
+        if ($schemaFile === null) {
+            throw new RuntimeException('install/schema.sql پیدا نشد. آن را یکی از این دو مسیر قرار دهید: '
+                . __DIR__ . '/install/schema.sql یا کنار خود install.php در ' . __DIR__ . '/schema.sql (سطح دسترسی ۶۴۴).');
+        }
         $pdo = new PDO("mysql:host=$dbHost;dbname=$dbName;charset=utf8mb4", $dbUser, $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         $pdo->exec('SET NAMES utf8mb4, FOREIGN_KEY_CHECKS = 0');
-        $schemaFile = $ROOT . '/install/schema.sql';
-        $sql = @file_get_contents($schemaFile);
-        if (!is_string($sql) || trim($sql) === '') {
-            throw new RuntimeException('فایل install/schema.sql خوانده نشد (' . $schemaFile . '). مطمئن شوید پوشهٔ install با فایل schema.sql درست کنار install.php (داخل همان پوشهٔ public_html) قرار دارد و قابل خواندن است (سطح دسترسی ۶۴۴).');
-        }
+        $sql = file_get_contents($schemaFile);
+        if (!is_string($sql) || trim($sql) === '') throw new RuntimeException('schema.sql خوانده نشد — سطح دسترسی فایل را ۶۴۴ کنید.');
         foreach (array_filter(array_map('trim', preg_split('/;\s*\n/', $sql) ?: [])) as $stmt) {
             if ($stmt !== '' && !str_starts_with($stmt, '--')) $pdo->exec($stmt);
         }
         $pdo->prepare('INSERT INTO users (username, display_name, password_hash, is_admin, is_active, must_change_password, created_at) VALUES ("admin", "مدیر سیستم", ?, 1, 1, 0, UTC_TIMESTAMP())')
             ->execute([password_hash($adminPass, PASSWORD_ARGON2ID)]);
-        // .env
+
+        $root = project_root();
         $env = <<<ENV
 CI_ENVIRONMENT = production
 
@@ -105,51 +137,37 @@ database.default.port = 3306
 
 INITIAL_ADMIN_PASSWORD = '{$adminPass}'
 ENV;
-        if (@file_put_contents($ROOT . '/.env', $env) === false) throw new RuntimeException('نوشتن .env ممکن نشد — دسترسی پوشه را بررسی کنید.');
-        // مسیر index.php اگر public به public_html منتقل شده باشد درست شود
-        fix_public_index($ROOT);
-        @mkdir($ROOT . '/writable/cache', 0755, true);
-        @mkdir($ROOT . '/writable/logs', 0755, true);
-        @mkdir($ROOT . '/writable/session', 0755, true);
-        @mkdir($ROOT . '/writable/uploads', 0755, true);
-        file_put_contents($ROOT . '/install.lock', date('c'));
-        render_page('نصب کامل شد ✓', '<div class="ok"><b>آزمون‌یار با موفقیت نصب شد!</b><br>ورود: <code>' . h($baseUrl) . '</code> با نام کاربری <code>admin</code>.<br><br>⚠ برای امنیت، فایل <code>install.php</code> را از هاست حذف کنید (این نصب‌کننده هم قفل شد).</div>', true);
+        if (@file_put_contents($root . '/.env', $env) === false) throw new RuntimeException("نوشتن .env در ریشهٔ پروژه ($root) ممکن نشد — دسترسی پوشه را ۷۵۵ کنید.");
+
+        foreach (['writable', 'writable/cache', 'writable/logs', 'writable/session', 'writable/uploads', 'writable/debugbar'] as $d) @mkdir($root . '/' . $d, 0755, true);
+        fix_public_index($root);
+        file_put_contents($LOCK, date('c'));
+
+        $instUrl = 'https://' . ($_SERVER['HTTP_HOST'] ?? 'your-domain') . '/';
+        render_page('نصب کامل شد ✓', '<div class="ok"><b>آزمون‌یار با موفقیت نصب شد!</b><br>ریشهٔ پروژه: <code>' . h($root) . '</code><br>ورود: <code>' . h($baseUrl ?: $instUrl) . '</code> با نام کاربری <code>admin</code>.<br><br>⚠ برای امنیت، فایل <code>install.php</code> و کل پوشهٔ <code>install</code> کنارش را از هاست حذف کنید.</div>', true);
     } catch (Throwable $e) {
         render_page('خطا در نصب', '<div class="err">' . h($e->getMessage()) . '<br><br><a href="install.php">تلاش مجدد</a></div>');
     }
 }
 
-/** مسیر bootstrap در index.php عمومی را به پروژهٔ اصلی (مثلاً ~/azmoon-yar) وصل می‌کند */
+/** اگر index.php عمومی به app مسیر معتبری ندارد، به ریشهٔ پروژه وصلش می‌کند */
 function fix_public_index(string $root): void
 {
     $idx = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/index.php';
     if ($idx === '/index.php' || !is_file($idx)) return;
     $content = @file_get_contents($idx);
     if (!is_string($content) || !str_contains($content, 'Paths.php')) return;
-    // اگر مسیر فعلیِ index به فایل موجودی اشاره می‌کند، دست نمی‌زنیم
     if (preg_match("#require FCPATH \.\s*'([^']*Paths\.php)'#", $content, $m)) {
         $p = $m[1];
         if (str_starts_with($p, '../')) $p = dirname($idx) . '/' . $p;
         elseif (!str_starts_with($p, '/')) $p = dirname($idx) . '/' . $p;
-        if (is_file($p)) return;
+        if (is_file($p)) return; // مسیر فعلی سالم است
     }
-    $cands = [
-        dirname($idx) . '/azmoon-yar/app/Config/Paths.php', // public_html کنارِ ~/azmoon-yar
-        dirname($root) . '/azmoon-yar/app/Config/Paths.php',
-        $root . '/app/Config/Paths.php', // کل پروژه داخل public_html
-    ];
-    foreach ($cands as $c) {
-        if (is_file($c)) {
-            $fixed = preg_replace("#require FCPATH \.\s*'[^']*Paths\.php';#", "require FCPATH . '" . str_replace('\\', '/', $c) . "';", $content, 1);
-            if ($fixed) @file_put_contents($idx, $fixed);
-            return;
-        }
+    $target = str_replace('\\', '/', $root) . '/app/Config/Paths.php';
+    if (is_file($target)) {
+        $fixed = preg_replace("#require FCPATH \.\s*'[^']*Paths\.php';#", "require FCPATH . '" . $target . "';", $content, 1);
+        if ($fixed) @file_put_contents($idx, $fixed);
     }
-}
-
-function locked_body(): string
-{
-    return '<div class="ok">نصب‌کننده قبلاً اجرا و قفل شده است. اگر نیاز به نصب مجدد دارید فایل <code>install.lock</code> را حذف کنید.</div>';
 }
 
 function render_page(string $title, string $body, bool $done = false): void
@@ -169,7 +187,7 @@ table{width:100%;border-collapse:collapse;font-size:12.5px}th,td{padding:8px 10p
 .frm button:disabled{opacity:.5;cursor:not-allowed}
 .ok{background:#e3f7ea;border:1px solid #b6e5c5;color:#14532d;border-radius:12px;padding:14px 16px;font-size:13px}
 .err{background:#fde5e5;border:1px solid #f5c2c2;color:#7f1d1d;border-radius:12px;padding:14px 16px;font-size:13px}
-code{background:#f1f4fa;border-radius:6px;padding:1px 7px;font-size:12px}
+code{background:#f1f4fa;border-radius:6px;padding:1px 7px;font-size:12px;direction:ltr;display:inline-block}
 </style></head><body><div class="wrap">
 <h1>✓ نصب‌کنندهٔ آزمون‌یار</h1><p class="sub">نصب یک‌بارمصرف روی هاست cPanel — بدون SSH و Composer</p>
 <?= $body ?>
