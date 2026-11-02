@@ -82,6 +82,8 @@ class UpdateController extends Controller
         // ۳) دانلود و ذخیره
         foreach ($files as $file) {
             $path = $file['name'] ?? '';
+            // حذف / ابتدایی که Data API اضافه می‌کند
+            $path = ltrim($path, '/');
             if ($path === '' || $path === '/') continue;
 
             $allowed = false;
