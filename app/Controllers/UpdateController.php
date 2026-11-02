@@ -135,14 +135,14 @@ class UpdateController extends Controller
     /** دانلود از چند منبع — اولین منبع تازه برمی‌گرداند */
     private function fetchFile(string $path): ?string
     {
-        // منبع ۱: jsdelivr با @main (کَش ممکن است)
-        $r = $this->fetch(self::CDN . self::REPO . '@main/' . $path);
-        if ($r !== null) return $r;
-        // منبع ۲: Statically CDN (کَش کمتر)
+        // منبع ۱: Statically CDN (کَش کمتر — تازه‌ترین)
         $r = $this->fetch('https://cdn.statically.io/gh/' . self::REPO . '/main/' . $path);
         if ($r !== null) return $r;
-        // منبع ۳: raw.githubusercontent.com (ممکن است بلاک باشد)
+        // منبع ۲: raw.githubusercontent (همیشه تازه، ممکن است در ایران بلاک باشد)
         $r = $this->fetch('https://raw.githubusercontent.com/' . self::REPO . '/main/' . $path);
+        if ($r !== null) return $r;
+        // منبع ۳: jsdelivr (قطعاً در ایران باز است ولی کَش تا ۱۲ ساعت)
+        $r = $this->fetch(self::CDN . self::REPO . '@main/' . $path);
         return $r;
     }
 
