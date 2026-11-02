@@ -142,16 +142,16 @@ class UpdateController extends Controller
         return $this->response->setJSON(['ok' => $updated > 0, 'message' => $msg, 'updated' => $updated]);
     }
 
-    /** دانلود یک فایل از CDN ها (به ترتیب اولویت) */
+    /** دانلود یک فایل — اولویت: raw.github (همیشه تازه) → Statically → jsdelivr */
     private function fetchFile(string $path): ?string
     {
-        // ۱: Statically — تازه‌ترین، در ایران در دسترس
+        // ۱: raw.githubusercontent — همیشه آخرین کامیت، بدون کَش
+        $r = $this->fetchUrl('https://raw.githubusercontent.com/' . self::REPO . '/main/' . $path);
+        if ($r !== null) return $r;
+        // ۲: Statically — در ایران در دسترس ولی کَش دارد
         $r = $this->fetchUrl(self::CDN_STAT . self::REPO . '/main/' . $path);
         if ($r !== null) return $r;
-        // ۲: raw.githubusercontent — همیشه تازه
-        $r = $this->fetchUrl(self::CDN_RAW . self::REPO . '/main/' . $path);
-        if ($r !== null) return $r;
-        // ۳: jsdelivr — fallback
+        // ۳: jsdelivr — fallback نهایی
         return $this->fetchUrl(self::CDN_JSD . self::REPO . '@main/' . $path);
     }
 
