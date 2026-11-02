@@ -104,7 +104,7 @@ class UpdateController extends Controller
             $content = $this->fetch(self::CDN . self::REPO . '@' . self::BRANCH . '/' . $path);
             if ($content === null) { $errors[] = "خطا در دریافت: $path"; continue; }
 
-            // ذخیره
+            // ذخیره در مسیر اصلی
             $target = $root . '/' . $path;
             $dir = dirname($target);
             if (!is_dir($dir)) @mkdir($dir, 0755, true);
@@ -112,6 +112,15 @@ class UpdateController extends Controller
                 $errors[] = "خطا در نوشتن: $path";
             } else {
                 $updated++;
+            }
+
+            // اگر فایل از public/assets است، در assets/ هم ذخیره کن (برای هاست‌هایی که public را flat کردند)
+            if (str_starts_with($path, 'public/assets/')) {
+                $altPath = substr($path, 7); // حذف 'public/'
+                $altTarget = $root . '/' . $altPath;
+                $altDir = dirname($altTarget);
+                if (!is_dir($altDir)) @mkdir($altDir, 0755, true);
+                @file_put_contents($altTarget, $content);
             }
         }
 
