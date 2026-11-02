@@ -47,9 +47,25 @@ if (getcwd() . DIRECTORY_SEPARATOR !== FCPATH) {
  */
 
 // LOAD OUR PATHS CONFIG FILE
-// This is the line that might need to be changed, depending on your folder structure.
-require FCPATH . '../app/Config/Paths.php';
-// ^^^ Change this line if you move your application folder
+// به‌صورت خودکار در چیدمان‌های رایج پیدا می‌شود: کنار public ، داخل همان پوشه، یا ~/azmoon-yar
+$_pathsCandidates = [
+    FCPATH . '../app/Config/Paths.php',        // استاندارد: app کنارِ public
+    FCPATH . 'app/Config/Paths.php',           // کل پروژه داخل Document Root
+    FCPATH . '../azmoon-yar/app/Config/Paths.php', // پروژه در ~/azmoon-yar
+];
+$_pathsPath = null;
+foreach ($_pathsCandidates as $_c) {
+    if (is_file($_c)) { $_pathsPath = $_c; break; }
+}
+if ($_pathsPath === null && is_file(FCPATH . '../../app/Config/Paths.php')) {
+    $_pathsPath = FCPATH . '../../app/Config/Paths.php';
+}
+if ($_pathsPath === null) {
+    http_response_code(500);
+    exit('app/Config/Paths.php not found. Looked in: ' . implode(' | ', $_pathsCandidates));
+}
+require $_pathsPath;
+unset($_pathsCandidates, $_c, $_pathsPath);
 
 $paths = new Paths();
 
