@@ -436,7 +436,7 @@ class ProjectsController extends BaseController
         if ($text === false || $text === '') return null;
         $bom = pack('H*', 'EFBBBF');
         $text = str_starts_with($text, $bom) ? substr($text, 3) : $text;
-        $lines = preg_split('/\r\n|\r|\n/', trim($text));
+        $lines = preg_split('/\r\n|\r|\n/', trim($text)) ?: [];
         if (count($lines) < 2) return null;
         $delim = str_contains($lines[0], "\t") ? "\t" : (str_contains($lines[0], ';') ? ';' : ',');
         $headers = array_map(fn($h) => trim($h, "\" \t"), explode($delim, array_shift($lines)));

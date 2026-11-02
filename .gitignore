@@ -128,3 +128,6 @@ _modules/*
 
 /results/
 /phpunit.xml
+
+# بستهٔ بیلد — محلی است، نه در مخزن
+/azmoon-yar-release.zip

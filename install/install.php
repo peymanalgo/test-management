@@ -37,7 +37,7 @@ function checks(): array
         ['ok' => version_compare(PHP_VERSION, '8.2.0', '>='), 'label' => 'PHP ≥ 8.2 (فعلی: ' . PHP_VERSION . ')'],
         $ext('mysqli'), $ext('mbstring'), $ext('intl'), $ext('json'), $ext('fileinfo'), $ext('gd'), $ext('zip'), $ext('dom'), $ext('xml'),
         $writable(__DIR__), $writable(__DIR__ . '/writable'),
-        ['ok' => is_file(__DIR__ . '/install/schema.sql'), 'label' => 'install/schema.sql موجود'],
+        ['ok' => is_file(__DIR__ . '/install/schema.sql') && is_readable(__DIR__ . '/install/schema.sql'), 'label' => 'install/schema.sql موجود و قابل خواندن'],
     ]);
 }
 
@@ -79,8 +79,12 @@ function do_install(): void
         if ($dbName === '' || $dbUser === '' || strlen($adminPass) < 12) throw new RuntimeException('همهٔ فیلدها الزامی است و رمز مدیر حداقل ۱۲ نویسه باشد.');
         $pdo = new PDO("mysql:host=$dbHost;dbname=$dbName;charset=utf8mb4", $dbUser, $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         $pdo->exec('SET NAMES utf8mb4, FOREIGN_KEY_CHECKS = 0');
-        $sql = file_get_contents($ROOT . '/install/schema.sql');
-        foreach (array_filter(array_map('trim', preg_split('/;\s*\n/', $sql))) as $stmt) {
+        $schemaFile = $ROOT . '/install/schema.sql';
+        $sql = @file_get_contents($schemaFile);
+        if (!is_string($sql) || trim($sql) === '') {
+            throw new RuntimeException('فایل install/schema.sql خوانده نشد (' . $schemaFile . '). مطمئن شوید پوشهٔ install با فایل schema.sql درست کنار install.php (داخل همان پوشهٔ public_html) قرار دارد و قابل خواندن است (سطح دسترسی ۶۴۴).');
+        }
+        foreach (array_filter(array_map('trim', preg_split('/;\s*\n/', $sql) ?: [])) as $stmt) {
             if ($stmt !== '' && !str_starts_with($stmt, '--')) $pdo->exec($stmt);
         }
         $pdo->prepare('INSERT INTO users (username, display_name, password_hash, is_admin, is_active, must_change_password, created_at) VALUES ("admin", "مدیر سیستم", ?, 1, 1, 0, UTC_TIMESTAMP())')
@@ -115,16 +119,32 @@ ENV;
     }
 }
 
-/** اگر محتوای public به public_html رفته و پروژه در ~/azmoon-yar است، مسیر paths را اصلاح می‌کند */
+/** مسیر bootstrap در index.php عمومی را به پروژهٔ اصلی (مثلاً ~/azmoon-yar) وصل می‌کند */
 function fix_public_index(string $root): void
 {
-    $homePublicIndex = $_SERVER['DOCUMENT_ROOT'] . '/index.php';
-    if (!is_file($homePublicIndex) || realpath($homePublicIndex) === realpath($root . '/public/index.php')) return;
-    $content = @file_get_contents($homePublicIndex);
-    if ($content === null || $content === false) return;
-    $target = "require FCPATH . '" . $root . "/app/Config/Paths.php';";
-    $fixed = preg_replace("#require FCPATH \.\s*'\.\./app/Config/Paths\.php';#u", $target, $content, 1, $count);
-    if ($count) @file_put_contents($homePublicIndex, $fixed);
+    $idx = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/index.php';
+    if ($idx === '/index.php' || !is_file($idx)) return;
+    $content = @file_get_contents($idx);
+    if (!is_string($content) || !str_contains($content, 'Paths.php')) return;
+    // اگر مسیر فعلیِ index به فایل موجودی اشاره می‌کند، دست نمی‌زنیم
+    if (preg_match("#require FCPATH \.\s*'([^']*Paths\.php)'#", $content, $m)) {
+        $p = $m[1];
+        if (str_starts_with($p, '../')) $p = dirname($idx) . '/' . $p;
+        elseif (!str_starts_with($p, '/')) $p = dirname($idx) . '/' . $p;
+        if (is_file($p)) return;
+    }
+    $cands = [
+        dirname($idx) . '/azmoon-yar/app/Config/Paths.php', // public_html کنارِ ~/azmoon-yar
+        dirname($root) . '/azmoon-yar/app/Config/Paths.php',
+        $root . '/app/Config/Paths.php', // کل پروژه داخل public_html
+    ];
+    foreach ($cands as $c) {
+        if (is_file($c)) {
+            $fixed = preg_replace("#require FCPATH \.\s*'[^']*Paths\.php';#", "require FCPATH . '" . str_replace('\\', '/', $c) . "';", $content, 1);
+            if ($fixed) @file_put_contents($idx, $fixed);
+            return;
+        }
+    }
 }
 
 function locked_body(): string
