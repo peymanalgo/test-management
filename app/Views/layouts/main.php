@@ -55,8 +55,21 @@ $i18nJs = [
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="csrf" content="<?= csrf_hash() ?>">
 <title><?= esc($title ?? t('app_name')) ?> | <?= t('app_name') ?></title>
-<link rel="stylesheet" href="/assets/css/theme.css?v=7">
-<script src="/assets/js/app.js?v=7"></script>
+<?php
+// CSS و JS به‌صورت inline — سازگار با هاست‌هایی که css/js/font را 403 می‌کنند
+$_css = @file_get_contents(FCPATH . 'assets/css/theme.css') ?: '';
+$_js  = @file_get_contents(FCPATH . 'assets/js/app.js') ?: '';
+// فونت وزیرمتن base64
+$_fontR = @file_get_contents(FCPATH . 'assets/fonts/Vazirmatn-Regular.woff2');
+$_fontB = @file_get_contents(FCPATH . 'assets/fonts/Vazirmatn-Bold.woff2');
+if ($_fontR !== false) {
+    $_fontCSS = "@font-face{font-family:'Vazirmatn';src:url(data:font/woff2;base64," . base64_encode($_fontR) . ") format('woff2');font-weight:400;font-display:swap}";
+    if ($_fontB !== false) $_fontCSS .= "@font-face{font-family:'Vazirmatn';src:url(data:font/woff2;base64," . base64_encode($_fontB) . ") format('woff2');font-weight:700;font-display:swap}";
+    $_css = $_fontCSS . "\n" . $_css;
+}
+?>
+<?php if ($_css !== ''): ?><style><?= $_css ?></style><?php else: ?><link rel="stylesheet" href="/assets/css/theme.css?v=8"><?php endif; ?>
+<?php if ($_js !== ''): ?><script><?= $_js ?></script><?php else: ?><script src="/assets/js/app.js?v=8" defer></script><?php endif; ?>
 <script>window.I18N = <?= json_encode($i18nJs, JSON_UNESCAPED_UNICODE) ?>;</script>
 </head>
 <body>

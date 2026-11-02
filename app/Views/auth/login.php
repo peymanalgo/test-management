@@ -6,7 +6,16 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="csrf" content="<?= csrf_hash() ?>">
 <title><?= t('login.heading') ?> | <?= t('app_name') ?></title>
-<link rel="stylesheet" href="/assets/css/theme.css?v=7">
+<?php
+// CSS inline — سازگار با هاست‌هایی که css را 403 می‌کنند
+$_css = @file_get_contents(FCPATH . 'assets/css/theme.css') ?: '';
+$_fontR = @file_get_contents(FCPATH . 'assets/fonts/Vazirmatn-Regular.woff2');
+$_fontB = @file_get_contents(FCPATH . 'assets/fonts/Vazirmatn-Bold.woff2');
+if ($_fontR !== false) {
+    $_css = "@font-face{font-family:'Vazirmatn';src:url(data:font/woff2;base64," . base64_encode($_fontR) . ") format('woff2');font-weight:400;font-display:swap}" . ($_fontB !== false ? "@font-face{font-family:'Vazirmatn';src:url(data:font/woff2;base64," . base64_encode($_fontB) . ") format('woff2');font-weight:700;font-display:swap}" : '') . "\n" . $_css;
+}
+?>
+<?php if ($_css !== ''): ?><style><?= $_css ?></style><?php else: ?><link rel="stylesheet" href="/assets/css/theme.css?v=8"><?php endif; ?>
 </head>
 <body class="auth-body">
 

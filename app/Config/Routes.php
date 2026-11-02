@@ -10,6 +10,8 @@ $routes->match(["GET", "POST"], 'login', 'AuthController::login');
 $routes->post('logout', 'AuthController::logout');
 $routes->get('logout', 'AuthController::logout');
 $routes->get('lang/(:alpha)', 'LangController::switch/$1');
+// فایل‌های استاتیک از طریق PHP — دور زدن مسدودسازی 403 سطح وب‌سرور هاست‌های اشتراکی
+$routes->get('assets/(:alpha)/(:any)', 'AssetController::serve/$1/$2');
 
 $routes->group('', ['filter' => 'auth'], static function (RouteCollection $routes): void {
 
