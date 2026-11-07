@@ -21,15 +21,33 @@ class ExportController extends BaseController
         if (!$node) return redirect()->to('/projects');
 
         $cases = $db->query(
-            'SELECT tc.code, tc.title, tc.objective, tc.preconditions, tc.priority, tc.test_type,
-                    tc.expected_result, tc.test_data,
-                    (SELECT GROUP_CONCAT(CONCAT(s.instruction, IF(s.expected_result IS NOT NULL AND s.expected_result != \'\', CONCAT(\'|\', s.expected_result), \'\')) SEPARATOR CHAR(10))
-                     FROM test_case_steps s WHERE s.test_case_id = tc.id ORDER BY s.step_order) steps
+            'SELECT tc.id, tc.code, tc.title, tc.objective, tc.preconditions, tc.priority, tc.test_type,
+                    tc.expected_result, tc.test_data
              FROM test_cases tc
              WHERE tc.node_id = ? AND tc.archived_at IS NULL
              ORDER BY tc.code',
             [$nodeId]
         )->getResultArray();
+
+        // مراحل هر سناریو جداگانه (ساده‌تر و مطمئن‌تر از subquery)
+        $allSteps = $db->query(
+            'SELECT s.test_case_id, s.instruction, s.expected_result
+             FROM test_case_steps s
+             JOIN test_cases tc ON tc.id = s.test_case_id
+             WHERE tc.node_id = ?
+             ORDER BY s.test_case_id, s.step_order',
+            [$nodeId]
+        )->getResultArray();
+        $stepsByCase = [];
+        foreach ($allSteps as $s) {
+            $line = $s['expected_result'] ? $s['instruction'] . '|' . $s['expected_result'] : $s['instruction'];
+            $stepsByCase[$s['test_case_id']][] = $line;
+        }
+        foreach ($cases as &$c) {
+            $c['steps'] = isset($stepsByCase[$c['id']])
+                ? implode("\n", $stepsByCase[$c['id']])
+                : '';
+        }
 
         $ss = new Spreadsheet();
         $sh = $ss->getActiveSheet();
