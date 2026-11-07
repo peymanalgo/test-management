@@ -474,21 +474,5 @@ return [
     'ntf.approved_msg' => 'سناریو «{code}» توسط مدیر پروژه تأیید شد.',
     'ntf.rejected' => 'نتیجهٔ سناریو رد شد',
     'ntf.cancelled' => 'سناریو لغو شد',
-
-    // آپدیت
-    'update.title' => 'آپدیت سامانه',
-    'update.desc' => 'بررسی و دریافت آخرین نسخهٔ کد از مخزن گیت‌هاب — فقط فایل‌های برنامه (بدون دیتابیس و تنظیمات).',
-    'update.checking' => 'در حال بررسی نسخهٔ جدید…',
-    'update.up_to_date' => 'شما آخرین نسخه را دارید.',
-    'update.new_version' => 'نسخهٔ جدیدی در دسترس است!',
-    'update.local_version' => 'نسخهٔ فعلی',
-    'update.remote_version' => 'آخرین نسخه',
-    'update.apply' => 'دریافت و اعمال آپدیت',
-    'update.applying' => 'در حال دریافت و اعمال…',
-    'update.done' => 'آپدیت با موفقیت اعمال شد.',
-    'update.failed' => 'آپدیت ناموفق بود.',
-    'update.connection_error' => 'خطا در اتصال به سرور آپدیت.',
-
     "notif.view_all" => "مشاهدهٔ همهٔ اعلان‌ها",
-    "update.recheck" => "بررسی مجدد",
 ];
