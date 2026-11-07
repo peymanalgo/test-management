@@ -16,11 +16,15 @@ $icons = [
     'workbench' => $ic('<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>'),
     'globe'     => $ic('<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>'),
     'update'    => $ic('<path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><polyline points="21 3 21 8 16 8"/><path d="M21 12a9 9 0 1 1-9-9"/>'),
+    'reports'   => $ic('<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>'),
+    'bug'       => $ic('<circle cx="12" cy="13" r="6"/><path d="M12 7V4"/><path d="m8 8-2-2"/><path d="m16 8 2-2"/><path d="M9 13h.01"/><path d="M15 13h.01"/>'),
 ];
 $adminMenu = [
     ['dashboard', 'nav.group.home', 'nav.dashboard', $icons['dashboard'], '/dashboard'],
     ['projects', 'nav.group.test', 'nav.projects', $icons['projects'], '/projects'],
     ['cases', 'nav.group.test', 'nav.cases', $icons['cases'], '/test-cases'],
+    ['defects', 'nav.group.test', 'nav.defects', $icons['bug'], '/defects'],
+    ['reports', 'nav.group.test', 'nav.reports', $icons['reports'], '/reports'],
     ['users', 'nav.group.system', 'nav.users', $icons['users'], '/admin/users'],
 ];
 $initials = mb_substr(session('display_name') ?? '؟', 0, 1);

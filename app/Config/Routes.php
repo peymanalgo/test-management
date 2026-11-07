@@ -44,6 +44,23 @@ $routes->group('', ['filter' => 'auth'], static function (RouteCollection $route
     $routes->get('admin/users/data', 'AdminUsersController::data');
     $routes->post('admin/users/save', 'AdminUsersController::save');
     $routes->post('admin/users/(:num)/toggle', 'AdminUsersController::toggle/$1');
+
+    // ---------------- ادمین: گزارش‌ها ----------------
+    $routes->get('reports', 'ReportsController::index');
+    $routes->get('reports/data', 'ReportsController::data');
+    $routes->get('reports/excel', 'ReportsController::excel');
+    $routes->get('reports/print', 'ReportsController::printView');
+
+    // ---------------- ادمین: خطاها ----------------
+    $routes->get('defects', 'DefectsController::index');
+    $routes->get('defects/data', 'DefectsController::data');
+    $routes->get('defects/(:num)/detail', 'DefectsController::detail/$1');
+    $routes->post('defects/(:num)/comment', 'DefectsController::comment/$1');
+
+    // ---------------- ادمین: خروجی Excel ----------------
+    $routes->get('export/cases/(:num)', 'ExportController::cases/$1');
+    $routes->get('export/defects', 'ExportController::defects');
+
     // ---------------- کارتابل (غیرادمین) ----------------
     $routes->get('workbench', 'WorkbenchController::index');
     $routes->get('workbench/(:num)/detail', 'WorkbenchController::detail/$1');          // جزئیات برای مودال

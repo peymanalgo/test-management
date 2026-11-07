@@ -289,6 +289,7 @@ function scenariosModal(nodeId, nodeName) {
           <select class="inp" data-status><option value="">${T.all_statuses}</option>${statusOptions}</select>
           <select class="inp" data-priority><option value="">${T.all_priorities}</option>${prioOptions}</select>
           <button class="btn" data-new>${T.new_case}</button>
+          <a class="export-btn" href="/export/cases/${nodeId}" title="خروجی Excel سناریوهای این بخش">📥 خروجی Excel</a>
           <button class="btn alt" data-import>${T.import}</button>
         </div>
       </div>
