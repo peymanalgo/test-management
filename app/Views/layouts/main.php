@@ -22,7 +22,6 @@ $adminMenu = [
     ['projects', 'nav.group.test', 'nav.projects', $icons['projects'], '/projects'],
     ['cases', 'nav.group.test', 'nav.cases', $icons['cases'], '/test-cases'],
     ['users', 'nav.group.system', 'nav.users', $icons['users'], '/admin/users'],
-    ['update', 'nav.group.system', 'update.title', $icons['update'], '/admin/update'],
 ];
 $initials = mb_substr(session('display_name') ?? '؟', 0, 1);
 
